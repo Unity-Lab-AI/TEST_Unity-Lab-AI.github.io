@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const SERVER_URL = "https://vps.unityailab.online";
+  const SERVER_URL = "https://vps.unityailab.online:3000";
   const USE_LOCAL_FALLBACK = true;
 
   const sessionListEl = document.getElementById("session-list");
