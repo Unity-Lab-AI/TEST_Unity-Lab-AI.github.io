@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const SERVER_URL = "http://vps.unityailab.online:3000"; // Changed to HTTP:3000
+  const SERVER_URL = "https://vps.unityailab.online"; // Updated to use Cloudflare HTTPS
   const USE_LOCAL_FALLBACK = false; // Set to false for live server interaction
 
   const sessionListEl = document.getElementById("session-list");
@@ -306,7 +306,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!response.ok) throw new Error(`Server error: ${response.status}`);
       const data = await response.json();
       if (data.token) localStorage.setItem("userToken", data.token);
-      return data.status === "registered" || data.status === "exists";
+      return data.status === "registered" || data.status ==="exists";
     } catch (err) {
       console.warn("Server registration failed:", err);
       return false;

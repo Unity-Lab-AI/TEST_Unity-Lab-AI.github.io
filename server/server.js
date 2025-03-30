@@ -105,7 +105,7 @@ app.get("/health", (req, res) => {
 });
 
 // Start the server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 80; // Changed from 3000 to 80
 app.listen(PORT, () => {
   console.log(
     `\nServer is listening on port ${PORT}.\n` +
