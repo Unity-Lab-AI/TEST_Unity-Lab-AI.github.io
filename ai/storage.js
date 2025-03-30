@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const SERVER_URL = "https://vps.unityailab.online:3000";
+  const SERVER_URL = "http://vps.unityailab.online:3000"; // Changed to HTTP:3000
   const USE_LOCAL_FALLBACK = false; // Set to false for live server interaction
 
   const sessionListEl = document.getElementById("session-list");
@@ -258,7 +258,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     checkOrGenerateUserId().then(() => {
       console.log("User ID validation complete");
-      // Force registration every load
       const userId = localStorage.getItem("uniqueUserId");
       if (userId) {
         registerUserIdWithServer(userId).catch(err => {
@@ -286,7 +285,7 @@ document.addEventListener("DOMContentLoaded", () => {
       userId = generateRandomId();
       localStorage.setItem("uniqueUserId", userId);
     }
-    await registerUserIdWithServer(userId); // Always register on load
+    await registerUserIdWithServer(userId);
     return userId;
   }
 
@@ -298,6 +297,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     const storedToken = localStorage.getItem("userToken");
     try {
+      console.log("Attempting to register userId:", userId, "with token:", storedToken);
       const response = await fetch(`${SERVER_URL}/api/registerUser`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -314,7 +314,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function generateRandomId() {
-    // Ensure 18-20 chars, lowercase alphanumeric
     return (Math.random().toString(36) + Date.now().toString(36)).substr(2, 20).toLowerCase().replace(/[^a-z0-9]/g, '');
   }
 
@@ -322,7 +321,7 @@ document.addEventListener("DOMContentLoaded", () => {
     updateVisitorCount();
     setInterval(() => {
       updateVisitorCount();
-    }, 60000); // 60 seconds
+    }, 60000);
   }
 
   async function updateVisitorCount() {
@@ -333,6 +332,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     try {
+      console.log("Fetching visitor count from:", SERVER_URL + "/api/visitorCount");
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000);
       const response = await fetch(`${SERVER_URL}/api/visitorCount`, {
