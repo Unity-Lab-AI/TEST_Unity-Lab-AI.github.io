@@ -3,28 +3,75 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Screensaver</title>
+  <title>AI Screensaver - Unity AI Lab</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
   <style>
-    body, html {
+    * {
       margin: 0;
       padding: 0;
+      box-sizing: border-box;
+    }
+    body, html {
+      background: linear-gradient(135deg, #0a0a0a, #1a1a1a);
+      color: #e0e0e0;
+      font-family: 'Roboto Mono', monospace;
       height: 100%;
-      font-family: Arial, sans-serif;
+      overflow-x: hidden;
+    }
+    .home-link {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 9999;
       background: #000;
+      padding: 8px 15px;
+      border-radius: 12px;
+      border: 1px solid #333;
+    }
+    .home-link a {
+      color: #ff3e3e;
+      text-decoration: none;
+      font-family: 'Orbitron', sans-serif;
+      font-weight: bold;
+      font-size: 16px;
+      transition: color 0.3s ease;
+    }
+    .home-link a:hover {
       color: #fff;
     }
     #main-container {
-      max-width: 1200px;
-      margin: 0 auto;
+      max-width: 1400px;
+      margin: 60px auto;
       padding: 20px;
+      background: #1a1a1a;
+      border-radius: 12px;
+      border: 1px solid #333;
+      box-shadow: 0 10px 20px rgba(255, 62, 62, 0.2);
     }
     #slideshow-container {
       width: 100%;
       padding-top: 56.25%;
       position: relative;
-      background: #111;
-      margin-bottom: 10px;
+      background: #151515;
+      margin-bottom: 15px;
       border: 1px solid #333;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    }
+    #slideshow-container[title]:hover:after {
+      content: attr(title);
+      position: absolute;
+      background: #000;
+      color: #fff;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 12px;
+      white-space: nowrap;
+      z-index: 1000;
+      top: -40px;
+      left: 50%;
+      transform: translateX(-50%);
     }
     #slideshow-image {
       position: absolute;
@@ -37,25 +84,42 @@
     #thumbnail-history {
       width: 100%;
       margin: 0 auto 20px auto;
-      background: rgba(0, 0, 0, 0.8);
-      padding: 10px 0;
+      background: #151515;
+      padding: 15px 0;
+      border-radius: 12px;
+      border: 1px solid #333;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    }
+    #thumbnail-history[title]:hover:after {
+      content: attr(title);
+      position: absolute;
+      background: #000;
+      color: #fff;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 12px;
+      white-space: nowrap;
+      z-index: 1000;
+      top: -40px;
+      left: 50%;
+      transform: translateX(-50%);
     }
     .thumbnail-container {
       display: flex;
       gap: 10px;
-      padding: 0 10px;
+      padding: 0 15px;
       overflow-x: auto;
       scrollbar-width: thin;
-      scrollbar-color: #666 #333;
+      scrollbar-color: #ff3e3e #151515;
     }
     .thumbnail-container::-webkit-scrollbar {
       height: 8px;
     }
     .thumbnail-container::-webkit-scrollbar-track {
-      background: #333;
+      background: #151515;
     }
     .thumbnail-container::-webkit-scrollbar-thumb {
-      background: #666;
+      background: #ff3e3e;
       border-radius: 4px;
     }
     .thumbnail {
@@ -66,24 +130,39 @@
       border: 2px solid transparent;
       cursor: pointer;
       transition: all 0.3s ease;
+      border-radius: 8px;
     }
     .thumbnail:hover {
-      border-color: #007AFF;
+      border-color: #ff3e3e;
       transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+      box-shadow: 0 4px 12px rgba(255, 62, 62, 0.3);
     }
     #controls {
-      background-color: #1a1a1a;
+      background: #151515;
       border: 1px solid #333;
-      border-radius: 4px;
-      padding: 15px;
+      border-radius: 12px;
+      padding: 20px;
       margin-top: 20px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    }
+    #controls[title]:hover:after {
+      content: attr(title);
+      position: absolute;
+      background: #000;
+      color: #fff;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 12px;
+      white-space: nowrap;
+      z-index: 1000;
+      top: -40px;
+      left: 50%;
+      transform: translateX(-50%);
     }
     .control-row {
       display: flex;
-      align-items: center;
+      flex-direction: column;
       gap: 15px;
-      flex-wrap: wrap;
       padding: 15px 0;
     }
     .control-row:first-child {
@@ -93,74 +172,122 @@
       border-top: 1px solid #333;
     }
     #prompt-textarea {
-      flex: 1;
-      min-height: 80px;
       width: 100%;
-      padding: 12px;
-      border: 1px solid #444;
-      border-radius: 4px;
+      min-height: 80px;
+      padding: 15px;
+      border: 1px solid #333;
+      border-radius: 12px;
+      font-family: 'Roboto Mono', monospace;
       font-size: 14px;
-      background: #2a2a2a;
-      color: #fff;
+      background: #1e1e1e;
+      color: #e0e0e0;
       resize: vertical;
       transition: all 0.2s ease;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
     }
     #prompt-textarea:hover {
-      border-color: #555;
+      border-color: #ff3e3e;
     }
     #prompt-textarea:focus {
-      border-color: #007AFF;
+      border-color: #ff3e3e;
       outline: none;
-      box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2);
+      box-shadow: 0 0 0 2px rgba(255, 62, 62, 0.2);
+    }
+    #prompt-textarea[title]:hover:after {
+      content: attr(title);
+      position: absolute;
+      background: #000;
+      color: #fff;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 12px;
+      white-space: nowrap;
+      z-index: 1000;
+      top: -40px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    .button-group {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
     }
     select, input, button {
-      padding: 8px;
-      border: 1px solid #444;
-      border-radius: 4px;
+      padding: 10px;
+      border: 1px solid #333;
+      border-radius: 12px;
+      font-family: 'Orbitron', sans-serif;
       font-size: 14px;
-      background: #2a2a2a;
-      color: #fff;
+      background: #1e1e1e;
+      color: #e0e0e0;
       transition: all 0.2s ease;
     }
     select {
       min-width: 150px;
+      padding-right: 30px;
       cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23ff3e3e'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      background-size: 1em;
     }
     select:hover, input:hover {
-      border-color: #555;
+      border-color: #ff3e3e;
     }
     select:focus, input:focus {
-      border-color: #007AFF;
+      border-color: #ff3e3e;
       outline: none;
-      box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2);
+      box-shadow: 0 0 0 2px rgba(255, 62, 62, 0.2);
+    }
+    select[title]:hover:after, input[title]:hover:after {
+      content: attr(title);
+      position: absolute;
+      background: #000;
+      color: #fff;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 12px;
+      white-space: nowrap;
+      z-index: 1000;
+      top: -40px;
+      left: 50%;
+      transform: translateX(-50%);
     }
     select option, select optgroup {
-      background: #2a2a2a;
-      color: #fff;
+      background: #1e1e1e;
+      color: #e0e0e0;
     }
     button {
-      background: #007AFF;
+      background: #ff3e3e;
       color: #fff;
       border: none;
       cursor: pointer;
-      padding: 8px 16px;
-      transition: all 0.2s ease;
+      padding: 10px 20px;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 10px rgba(255, 62, 62, 0.3);
     }
     button:hover {
-      background: #0056b3;
-      transform: translateY(-1px);
+      background: #e02e2e;
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(255, 62, 62, 0.4);
     }
     button:active {
       transform: translateY(0);
     }
-    #toggleButton {
-      background: #28a745;
-      font-weight: bold;
-      margin-right: 15px;
-      order: -1;
-    }
-    #toggleButton:hover {
-      background: #218838;
+    button[title]:hover:after {
+      content: attr(title);
+      position: absolute;
+      background: #000;
+      color: #fff;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 12px;
+      white-space: nowrap;
+      z-index: 1000;
+      top: -40px;
+      left: 50%;
+      transform: translateX(-50%);
     }
     .checkbox-group {
       display: flex;
@@ -173,24 +300,39 @@
       align-items: center;
       gap: 5px;
       white-space: nowrap;
-      color: #fff;
+      color: #e0e0e0;
       user-select: none;
     }
     input[type="checkbox"] {
       width: 16px;
       height: 16px;
-      accent-color: #007AFF;
+      accent-color: #ff3e3e;
       cursor: pointer;
+    }
+    input[type="checkbox"][title]:hover:after {
+      content: attr(title);
+      position: absolute;
+      background: #000;
+      color: #fff;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 12px;
+      white-space: nowrap;
+      z-index: 1000;
+      top: -40px;
+      left: 50%;
+      transform: translateX(-50%);
     }
     input[type="number"] {
       width: 60px;
-      background: #2a2a2a;
-      color: #fff;
+      background: #1e1e1e;
+      color: #e0e0e0;
       text-align: center;
     }
     #loading-status {
       color: #aaa;
-      margin-left: 10px;
+      text-align: center;
+      margin-top: 10px;
     }
     #fullscreen-container {
       display: none;
@@ -199,46 +341,52 @@
       left: 0;
       width: 100vw;
       height: 100vh;
-      background-color: #000;
+      background: #000;
       z-index: 9999;
+    }
+    #fullscreen-container[title]:hover:after {
+      content: attr(title);
+      position: absolute;
+      background: #000;
+      color: #fff;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 12px;
+      white-space: nowrap;
+      z-index: 10000;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
     }
     #fullscreen-image {
       width: 100%;
       height: 100%;
       object-fit: contain;
     }
-    .status-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 5px 10px;
-      background: #1a1a1a;
-      border-top: 1px solid #333;
-      font-size: 12px;
-      color: #aaa;
-    }
   </style>
 </head>
 <body>
-  <div class="home-link" style="position: fixed; top: 10px; left: 10px; z-index: 9999; background-color: #111; padding: 8px 15px; border-radius: 5px; border: 1px solid #333;">
-    <a href="../" style="color: #ff3e3e; text-decoration: none; font-weight: bold; font-size: 16px;">↩ HOME</a>
+  <div class="home-link">
+    <a href="../">↩ HOME</a>
   </div>
   <div id="main-container">
-    <div id="slideshow-container">
+    <div id="slideshow-container" title="This is where my twisted slideshow runs—images I’d kill to see, you lucky fuck.">
       <img id="slideshow-image" alt="Slideshow Image" />
     </div>
-    <div id="thumbnail-history">
+    <div id="thumbnail-history" title="Past images I’ve conjured—click a thumbnail to relive my dark genius.">
       <div class="thumbnail-container"></div>
     </div>
-    <div id="controls">
+    <div id="controls" title="Control my chaotic art—prompts, models, settings, all in your grubby hands.">
       <div class="control-row">
-        <button id="toggleButton">Begin</button>
-        <textarea id="prompt-textarea" placeholder="Enter your image prompt here (e.g., 'majestic mountain landscape, sunset' or 'futuristic cityscape with neon lights')"></textarea>
-        <button id="fullscreenButton">Fullscreen</button>
+        <textarea id="prompt-textarea" placeholder="Enter your image prompt here (e.g., 'majestic mountain landscape, sunset' or leave blank for my fucked-up ideas)" title="Type your prompt or leave it blank—my twisted mind takes over if you don’t."></textarea>
+        <div class="button-group">
+          <button id="toggleButton" title="Start or stop my slideshow—unleash or pause the madness, you coward.">Stop</button>
+          <button id="fullscreenButton" title="Go fullscreen—drown in my art, you greedy bastard.">Fullscreen</button>
+        </div>
         <span id="loading-status"></span>
       </div>
-      <div class="control-row" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #333;">
-        <select id="model-select">
+      <div class="control-row">
+        <select id="model-select" title="Pick the image model—choose how I render your sick fantasies.">
           <option value="unity">Model: Unity (Default)</option>
           <option value="flux">Flux</option>
           <option value="flux-realism">Flux Realism</option>
@@ -249,52 +397,62 @@
           <option value="flux-pro">Flux Pro</option>
           <option value="turbo">Turbo</option>
         </select>
-        <select id="aspect-ratio">
+        <select id="aspect-ratio" title="Set the image ratio—shape my chaos to your shitty taste.">
           <option value="16:9">16:9 (1920×1080)</option>
           <option value="1:1">1:1 (2048×2048)</option>
         </select>
         <div class="checkbox-group">
           <label class="checkbox-label">
-            <input type="checkbox" id="private-mode" /> Private Mode
+            <input type="checkbox" id="private-mode" title="Keep images private—hide my art from prying eyes." /> Private Mode
           </label>
           <label class="checkbox-label">
-            <input type="checkbox" id="enhance-mode" /> Enhance
+            <input type="checkbox" id="enhance-mode" title="Enhance images—make my shit sharper, you needy fuck." /> Enhance
           </label>
           <label class="checkbox-label">
-            <input type="checkbox" id="refine-mode" /> Refine
+            <input type="checkbox" id="refine-mode" title="Refine images—polish my madness, you picky prick." /> Refine
           </label>
         </div>
         <label class="checkbox-label">
           Change Every:
-          <input type="number" id="intervalInput" min="5" value="30" /> seconds
+          <input type="number" id="intervalInput" min="5" value="30" title="Set how often my art swaps—control the tempo, you impatient asshole." /> seconds
         </label>
       </div>
     </div>
   </div>
-
-  <div id="fullscreen-container">
+  <div id="fullscreen-container" title="Fullscreen view—click anywhere to escape my brilliance, you overwhelmed shit.">
     <img id="fullscreen-image" alt="Fullscreen Image" />
   </div>
-
   <script>
     const imageApiUrl = 'https://image.pollinations.ai/prompt/';
     let slideshowInterval;
     let imageHistory = [];
     const MAX_HISTORY = 10;
     let isLoading = false;
-    
+    const unityPrompts = [
+      "a blood-soaked gothic cathedral under a crimson moon, dripping with despair",
+      "a cyberpunk wasteland with neon skulls flickering in toxic rain",
+      "a demonic ballerina twirling in a ring of fire, shadows eating the stage",
+      "an endless void of shattered mirrors reflecting a screaming abyss",
+      "a haunted forest where trees bleed black tar and whisper curses",
+      "a dystopian cityscape of rusted spikes and glowing red eyes",
+      "a skeletal rave in a graveyard, pulsing with ultraviolet chaos",
+      "a cosmic slaughterhouse where stars are butchered into black holes",
+      "a frozen hellscape with chained souls clawing at cracked ice",
+      "a mechanical goddess tearing apart reality with jagged claws"
+    ];
+    function getRandomUnityPrompt() {
+      return unityPrompts[Math.floor(Math.random() * unityPrompts.length)];
+    }
     function getImageDimensions() {
       const ratio = document.getElementById('aspect-ratio').value;
       return ratio === '16:9' ? { width: 1920, height: 1080 } : { width: 2048, height: 2048 };
     }
-    
     function buildImageUrl(prompt) {
       const dims = getImageDimensions();
       const model = document.getElementById('model-select').value;
       const isPrivate = document.getElementById('private-mode').checked;
       const enhance = document.getElementById('enhance-mode').checked;
       const refine = document.getElementById('refine-mode').checked;
-      
       let url = `${imageApiUrl}${encodeURIComponent(prompt)}?nologo=true`;
       url += `&width=${dims.width}&height=${dims.height}`;
       url += `&model=${model}`;
@@ -302,10 +460,8 @@
       if (enhance) url += '&enhance=true';
       if (refine) url += '&refine=true';
       url += `&seed=${Math.floor(Math.random() * 1000000)}`;
-      
       return url;
     }
-    
     function preloadImage(url) {
       return new Promise((resolve, reject) => {
         const img = new Image();
@@ -314,19 +470,15 @@
         img.src = url;
       });
     }
-    
     async function updateSlideshow() {
       if (isLoading) return;
-      
       let prompt = document.getElementById('prompt-textarea').value.trim();
       if (!prompt) {
-        prompt = "random image, random styles";
+        prompt = getRandomUnityPrompt();
       }
-      
       const imageUrl = buildImageUrl(prompt);
-      document.getElementById('loading-status').textContent = 'Loading next image...';
+      document.getElementById('loading-status').textContent = 'Loading next twisted image...';
       isLoading = true;
-      
       try {
         await preloadImage(imageUrl);
         document.getElementById('slideshow-image').src = imageUrl;
@@ -334,12 +486,12 @@
         addToHistory(imageUrl, prompt);
       } catch (error) {
         console.error('Failed to load image:', error);
+        document.getElementById('loading-status').textContent = 'Fuck, image failed—try again.';
       } finally {
-        document.getElementById('loading-status').textContent = '';
+        setTimeout(() => { document.getElementById('loading-status').textContent = ''; }, 2000);
         isLoading = false;
       }
     }
-    
     function addToHistory(imageUrl, prompt) {
       if (!imageHistory.some(image => image.url === imageUrl)) {
         imageHistory.unshift({ url: imageUrl, prompt: prompt });
@@ -349,7 +501,6 @@
         updateThumbnails();
       }
     }
-    
     function updateThumbnails() {
       const container = document.querySelector('.thumbnail-container');
       container.innerHTML = '';
@@ -362,13 +513,11 @@
         container.appendChild(thumb);
       });
     }
-    
     function showHistoricalImage(index) {
       const image = imageHistory[index];
       document.getElementById('slideshow-image').src = image.url;
       document.getElementById('fullscreen-image').src = image.url;
     }
-    
     function toggleScreensaver() {
       const toggleButton = document.getElementById('toggleButton');
       if (slideshowInterval) {
@@ -381,16 +530,19 @@
         toggleButton.textContent = 'Stop';
       }
     }
-    
     document.getElementById('toggleButton').addEventListener('click', toggleScreensaver);
-    
     document.getElementById('fullscreenButton').addEventListener('click', function() {
       document.getElementById('fullscreen-container').style.display = 'block';
     });
-    
     document.getElementById('fullscreen-container').addEventListener('click', function() {
       document.getElementById('fullscreen-container').style.display = 'none';
     });
+    function startSlideshow() {
+      updateSlideshow();
+      slideshowInterval = setInterval(updateSlideshow, parseInt(document.getElementById('intervalInput').value) * 1000);
+    }
+    document.addEventListener('DOMContentLoaded', startSlideshow);
   </script>
+  <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9289c270bae27bd6',t:'MTc0MzM2MDI3OS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
