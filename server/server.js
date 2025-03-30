@@ -14,12 +14,16 @@ app.use(express.json());
 const dataFilePath = path.join(__dirname, "userData.json");
 
 // Load existing user IDs into memory at startup
-let userIds = new Set();
+let userIds = new Map(); // id -> token
 if (fs.existsSync(dataFilePath)) {
   try {
     const data = JSON.parse(fs.readFileSync(dataFilePath, "utf8"));
     if (Array.isArray(data.userIds)) {
-      userIds = new Set(data.userIds);
+      // Backward compatibility with old format
+      data.userIds.forEach(id => userIds.set(id, null));
+    } else if (data.userIds) {
+      // New format: { "userIds": { "id1": "token1", "id2": "token2" } }
+      Object.entries(data.userIds).forEach(([id, token]) => userIds.set(id, token));
     }
   } catch (err) {
     console.error("Error reading userData.json:", err.message);
@@ -29,7 +33,7 @@ if (fs.existsSync(dataFilePath)) {
 // Helper to save user IDs to file
 function saveUserIdsToFile() {
   try {
-    const data = { userIds: [...userIds] };
+    const data = { userIds: Object.fromEntries(userIds) };
     fs.writeFileSync(dataFilePath, JSON.stringify(data, null, 2));
   } catch (err) {
     console.error("Error writing to userData.json:", err.message);
@@ -38,9 +42,13 @@ function saveUserIdsToFile() {
 
 // Helper to validate user ID format
 function isValidUserId(userId) {
-  // Must be a string, 18-20 characters, lowercase alphanumeric (a-z, 0-9)
   const userIdRegex = /^[a-z0-9]{18,20}$/;
   return typeof userId === "string" && userIdRegex.test(userId);
+}
+
+// Helper to generate a token
+function generateToken() {
+  return Math.random().toString(36).substr(2, 10);
 }
 
 // Middleware for logging requests
@@ -53,7 +61,7 @@ app.use((req, res, next) => {
 //   REGISTER USER ID
 // =======================
 app.post("/api/registerUser", (req, res) => {
-  const { userId } = req.body;
+  const { userId, token } = req.body;
 
   // Validate request body
   if (!userId) {
@@ -67,13 +75,21 @@ app.post("/api/registerUser", (req, res) => {
 
   // Check if userId already exists
   if (userIds.has(userId)) {
-    return res.status(200).json({ status: "exists" });
+    const storedToken = userIds.get(userId);
+    if (token && storedToken && token === storedToken) {
+      return res.status(200).json({ status: "exists" });
+    } else if (!token && !storedToken) {
+      // Allow old clients without tokens (backward compatibility)
+      return res.status(200).json({ status: "exists" });
+    }
+    return res.status(403).json({ error: "Invalid or missing token" });
   }
 
-  // Add new userId
-  userIds.add(userId);
+  // New userId: generate token, store, and return it
+  const newToken = generateToken();
+  userIds.set(userId, newToken);
   saveUserIdsToFile();
-  return res.status(201).json({ status: "registered" });
+  return res.status(201).json({ status: "registered", token: newToken });
 });
 
 // =======================

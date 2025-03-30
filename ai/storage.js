@@ -1,6 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
   const SERVER_URL = "https://vps.unityailab.online:3000";
-  const USE_LOCAL_FALLBACK = true;
+  const USE_LOCAL_FALLBACK = false; // Set to false for live server interaction
 
   const sessionListEl = document.getElementById("session-list");
   let sessions = loadSessions();
@@ -258,6 +258,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     checkOrGenerateUserId().then(() => {
       console.log("User ID validation complete");
+      // Force registration every load
+      const userId = localStorage.getItem("uniqueUserId");
+      if (userId) {
+        registerUserIdWithServer(userId).catch(err => {
+          console.warn("Server registration failed:", err);
+          ensureLocalUserId();
+        });
+      }
     }).catch(err => {
       console.warn("Problem with user ID, using local fallback:", err);
       ensureLocalUserId();
@@ -276,19 +284,9 @@ document.addEventListener("DOMContentLoaded", () => {
     let userId = localStorage.getItem("uniqueUserId");
     if (!userId) {
       userId = generateRandomId();
-      let success = false;
-      if (!USE_LOCAL_FALLBACK) {
-        try {
-          success = await registerUserIdWithServer(userId);
-        } catch (err) {
-          console.warn("Server registration failed, using local fallback:", err);
-          success = true;
-        }
-      } else {
-        success = true;
-      }
       localStorage.setItem("uniqueUserId", userId);
     }
+    await registerUserIdWithServer(userId); // Always register on load
     return userId;
   }
 
@@ -298,32 +296,33 @@ document.addEventListener("DOMContentLoaded", () => {
       await new Promise(resolve => setTimeout(resolve, 100));
       return true;
     }
+    const storedToken = localStorage.getItem("userToken");
     try {
       const response = await fetch(`${SERVER_URL}/api/registerUser`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId })
+        body: JSON.stringify({ userId, token: storedToken })
       });
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`Server error: ${response.status}`);
       const data = await response.json();
+      if (data.token) localStorage.setItem("userToken", data.token);
       return data.status === "registered" || data.status === "exists";
     } catch (err) {
       console.warn("Server registration failed:", err);
-      return true;
+      return false;
     }
   }
 
   function generateRandomId() {
-    return Math.random().toString(36).substr(2, 12) + Date.now().toString(36);
+    // Ensure 18-20 chars, lowercase alphanumeric
+    return (Math.random().toString(36) + Date.now().toString(36)).substr(2, 20).toLowerCase().replace(/[^a-z0-9]/g, '');
   }
 
   function startVisitorCountPolling() {
     updateVisitorCount();
     setInterval(() => {
       updateVisitorCount();
-    }, 300000);
+    }, 60000); // 60 seconds
   }
 
   async function updateVisitorCount() {
@@ -340,9 +339,7 @@ document.addEventListener("DOMContentLoaded", () => {
         signal: controller.signal
       });
       clearTimeout(timeoutId);
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`Server error: ${response.status}`);
       const data = await response.json();
       visitorDisplay.textContent = data.count.toLocaleString();
     } catch (err) {
