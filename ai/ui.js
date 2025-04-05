@@ -31,6 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const clearUserDataBtn = document.getElementById("clear-user-data-btn");
     const toggleSimpleModeBtn = document.getElementById("toggle-simple-mode");
 
+    // Ensure we have a <link id="theme-link"> for dynamic theme loading
     let themeLinkElement = document.getElementById("theme-link");
     if (!themeLinkElement) {
         themeLinkElement = document.createElement("link");
@@ -108,9 +109,11 @@ document.addEventListener("DOMContentLoaded", () => {
         changeTheme(themeSelectSettings.value);
     });
 
+    // Fetch the list of pollinations text models, populate model-select
     function fetchPollinationsModels() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
+
         fetch("https://text.pollinations.ai/models", {
             method: "GET",
             headers: { "Content-Type": "application/json" },
@@ -129,7 +132,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     console.error("Models response is not an array:", models);
                     throw new Error("Invalid models response");
                 }
-                console.log("Fetched models:", models);
                 modelSelect.innerHTML = "";
                 let hasValidModel = false;
 
@@ -165,9 +167,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 const currentSession = Storage.getCurrentSession();
                 if (currentSession && currentSession.model) {
-                    const modelExists = Array.from(modelSelect.options).some(
-                        option => option.value === currentSession.model
-                    );
+                    const modelExists = Array.from(modelSelect.options).some(option => option.value === currentSession.model);
                     if (modelExists) {
                         modelSelect.value = currentSession.model;
                     } else {
@@ -223,7 +223,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (currentSession) {
             const newModel = modelSelect.value;
             Storage.setSessionModel(currentSession.id, newModel);
-            console.log(`Model updated to: ${newModel}`);
             const originalBg = modelSelect.style.backgroundColor;
             modelSelect.style.backgroundColor = "#4CAF50";
             modelSelect.style.color = "white";
@@ -231,9 +230,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 modelSelect.style.backgroundColor = originalBg;
                 modelSelect.style.color = "";
             }, 500);
+            window.showToast(`Model updated to: ${newModel}`);
         }
     });
 
+    // Donation modal
     donationOpenBtn.addEventListener("click", () => {
         donationModal.classList.remove("hidden");
     });
@@ -241,8 +242,10 @@ document.addEventListener("DOMContentLoaded", () => {
         donationModal.classList.add("hidden");
     });
 
+    // Settings modal
     openSettingsBtn.addEventListener("click", () => {
         settingsModal.classList.remove("hidden");
+        // Populate voices if available:
         if (window._chatInternals && window._chatInternals.voices && window._chatInternals.voices.length > 0) {
             window._chatInternals.populateAllVoiceDropdowns();
         }
@@ -251,6 +254,7 @@ document.addEventListener("DOMContentLoaded", () => {
         settingsModal.classList.add("hidden");
     });
 
+    // Personalization
     if (openPersonalizationBtn) {
         openPersonalizationBtn.addEventListener("click", () => {
             openPersonalizationModal();
@@ -332,6 +336,7 @@ document.addEventListener("DOMContentLoaded", () => {
         Memory.addMemoryEntry(memoryText);
     }
 
+    // Memory Manager
     openMemoryManagerBtn.addEventListener("click", () => {
         memoryModal.classList.remove("hidden");
         loadMemoryEntries();
@@ -351,144 +356,98 @@ document.addEventListener("DOMContentLoaded", () => {
         addMemoryModal.classList.add("hidden");
     });
     saveNewMemoryBtn.addEventListener("click", () => {
-        const txt = newMemoryText.value.trim();
-        if (!txt) return;
-        Memory.addMemoryEntry(txt);
-        addMemoryModal.classList.add("hidden");
-        loadMemoryEntries();
-        window.showToast("Memory added successfully");
-    });
-
-    clearAllMemoryBtn.addEventListener("click", () => {
-        if (!confirm("Are you sure you want to clear ALL memory entries?")) return;
-        Memory.clearAllMemories();
-        loadMemoryEntries();
-        window.showToast("All memories cleared");
+        const text = newMemoryText.value.trim();
+        if (!text) {
+            window.showToast("Memory text cannot be empty");
+            return;
+        }
+        const result = Memory.addMemoryEntry(text);
+        if (result) {
+            window.showToast("Memory added!");
+            addMemoryModal.classList.add("hidden");
+            loadMemoryEntries();
+        } else {
+            window.showToast("Could not add memory entry");
+        }
     });
 
     function loadMemoryEntries() {
         memoryList.innerHTML = "";
-        const arr = Memory.getMemories();
-        arr.forEach((line, idx) => {
+        const memories = Memory.getMemories();
+        if (memories.length === 0) {
             const li = document.createElement("li");
-            li.style.padding = "8px";
-            li.style.marginBottom = "6px";
-            li.style.backgroundColor = "rgba(0,0,0,0.05)";
-            li.style.borderRadius = "8px";
-            li.style.display = "flex";
-            li.style.justifyContent = "space-between";
-            li.style.alignItems = "flex-start";
-            const textDiv = document.createElement("div");
-            textDiv.style.flex = "1";
-            textDiv.style.marginRight = "10px";
-            textDiv.textContent = line;
-            li.appendChild(textDiv);
-
-            const btnContainer = document.createElement("div");
-            btnContainer.style.display = "flex";
-            btnContainer.style.gap = "6px";
-
-            const editBtn = document.createElement("button");
-            editBtn.className = "btn btn-sm btn-secondary";
-            editBtn.innerHTML = '<i class="fas fa-pen"></i>';
-            editBtn.title = "Edit this memory entry";
-            editBtn.style.minWidth = "40px";
-            editBtn.addEventListener("click", () => {
-                const newText = prompt("Edit memory entry:", line);
-                if (!newText || newText.trim() === line) {
+            li.textContent = "No memories stored yet.";
+            memoryList.appendChild(li);
+            return;
+        }
+        memories.forEach((mem, index) => {
+            const li = document.createElement("li");
+            li.textContent = mem;
+            li.addEventListener("click", () => {
+                const newText = prompt("Edit this memory entry:", mem);
+                if (newText === null) return;
+                if (newText.trim() === "") {
+                    window.showToast("Memory text cannot be empty");
                     return;
                 }
-                const success = Memory.updateMemoryEntry(idx, newText);
-                if (success) {
-                    window.showToast("Memory updated");
+                Memory.updateMemoryEntry(index, newText);
+                loadMemoryEntries();
+            });
+            const delBtn = document.createElement("button");
+            delBtn.textContent = "Delete";
+            delBtn.className = "btn btn-danger btn-sm float-end";
+            delBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                if (confirm("Are you sure you want to delete this memory entry?")) {
+                    Memory.removeMemoryEntry(index);
                     loadMemoryEntries();
                 }
             });
-            btnContainer.appendChild(editBtn);
-
-            const delBtn = document.createElement("button");
-            delBtn.className = "btn btn-sm btn-danger";
-            delBtn.innerHTML = '<i class="fas fa-trash"></i>';
-            delBtn.title = "Delete this memory entry";
-            delBtn.style.minWidth = "40px";
-            delBtn.addEventListener("click", () => {
-                if (!confirm(`Delete memory entry?\n"${line.substring(0, 50)}${line.length > 50 ? '...' : ''}"`)) {
-                    return;
-                }
-                Memory.removeMemoryEntry(idx);
-                loadMemoryEntries();
-                window.showToast("Memory deleted");
-            });
-            btnContainer.appendChild(delBtn);
-
-            li.appendChild(btnContainer);
+            li.appendChild(delBtn);
             memoryList.appendChild(li);
         });
-
-        if (arr.length === 0) {
-            const emptyMsg = document.createElement("p");
-            emptyMsg.className = "text-center text-muted";
-            emptyMsg.textContent = "No memories saved yet. Add a memory using the button below.";
-            memoryList.appendChild(emptyMsg);
-        }
     }
 
-    clearChatSessionsBtn.addEventListener("click", () => {
-        if (!confirm("Are you sure you want to CLEAR ALL chat sessions?")) return;
-        Storage.clearAllSessions();
-        window.showToast("All chat sessions removed");
-        setTimeout(() => {
-            location.reload();
-        }, 1000);
+    clearAllMemoryBtn.addEventListener("click", () => {
+        if (confirm("Are you sure you want to clear all memory entries?")) {
+            const result = Memory.clearAllMemories();
+            if (result) {
+                window.showToast("All memories cleared!");
+                loadMemoryEntries();
+            } else {
+                window.showToast("Failed to clear memories");
+            }
+        }
     });
 
-    clearUserDataBtn.addEventListener("click", () => {
-        if (!confirm("Are you sure you want to DELETE ALL USER DATA? This will remove all chat history, memories, and settings.")) return;
-        Storage.clearAllSessions();
-        Memory.clearAllMemories();
-        localStorage.clear();
-        document.cookie.split(";").forEach(cookie => {
-            const eqPos = cookie.indexOf("=");
-            const name = eqPos > -1 ? cookie.substring(0, eqPos) : cookie;
-            document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    // Clear Chat Sessions
+    if (clearChatSessionsBtn) {
+        clearChatSessionsBtn.addEventListener("click", () => {
+            if (confirm("Are you sure you want to clear ALL chat sessions? This cannot be undone.")) {
+                Storage.clearAllSessions();
+                document.getElementById("chat-box").innerHTML = "";
+                window.showToast("All chat sessions cleared");
+            }
         });
-        window.showToast("All data has been deleted. Reloading page...");
-        setTimeout(() => {
-            location.reload();
-        }, 1500);
-    });
+    }
 
-    toggleSimpleModeBtn.addEventListener("click", () => {
-        if (window.toggleSimpleMode) {
-            window.toggleSimpleMode();
-        } else {
-            console.error("Simple Mode not available");
-            window.showToast("Simple Mode is not loaded yet");
-        }
-    });
+    // Clear ALL user data
+    if (clearUserDataBtn) {
+        clearUserDataBtn.addEventListener("click", () => {
+            if (confirm("This will permanently delete ALL your data (sessions, memories, settings). Are you absolutely sure?")) {
+                Storage.deleteAllUserData();
+            }
+        });
+    }
 
-    window.showToast = function(message, duration = 3000) {
-        let toast = document.getElementById("toast-notification");
-        if (!toast) {
-            toast = document.createElement("div");
-            toast.id = "toast-notification";
-            toast.style.position = "fixed";
-            toast.style.top = "5%";
-            toast.style.left = "50%";
-            toast.style.transform = "translateX(-50%)";
-            toast.style.backgroundColor = "rgba(0,0,0,0.7)";
-            toast.style.color = "#fff";
-            toast.style.padding = "10px 20px";
-            toast.style.borderRadius = "5px";
-            toast.style.zIndex = "9999";
-            toast.style.transition = "opacity 0.3s";
-            document.body.appendChild(toast);
-        }
-        toast.textContent = message;
-        toast.style.opacity = "1";
-        clearTimeout(toast.timeout);
-        toast.timeout = setTimeout(() => {
-            toast.style.opacity = "0";
-        }, duration);
-    };
+    // Simple Mode
+    if (toggleSimpleModeBtn) {
+        toggleSimpleModeBtn.addEventListener("click", () => {
+            if (typeof window.openSimpleMode === "function") {
+                window.openSimpleMode();
+            } else {
+                window.showToast("Simple Mode script not loaded or function missing.");
+            }
+        });
+    }
 });

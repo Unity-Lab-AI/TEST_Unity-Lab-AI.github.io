@@ -1,6 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const SERVER_URL = "https://vps.unityailab.online"; // Updated to use Cloudflare HTTPS
-  const USE_LOCAL_FALLBACK = false; // Set to false for live server interaction
+  const SERVER_URL = "https://vps.unityailab.online:3000";
+  const USE_LOCAL_FALLBACK = true;
 
   const sessionListEl = document.getElementById("session-list");
   let sessions = loadSessions();
@@ -166,6 +166,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
       titleSpan.textContent = displayName;
+
       const editBtn = document.createElement("button");
       editBtn.classList.add("session-edit-btn");
       editBtn.innerHTML = '<i class="fas fa-edit"></i>';
@@ -177,6 +178,7 @@ document.addEventListener("DOMContentLoaded", () => {
           renameSession(session.id, newName.trim());
         }
       });
+
       const delBtn = document.createElement("button");
       delBtn.classList.add("session-delete-btn");
       delBtn.innerHTML = '<i class="fas fa-trash"></i>';
@@ -186,12 +188,14 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!confirm(`Are you sure you want to delete session "${session.name}"?`)) return;
         deleteSession(session.id);
       });
+
       const controlsDiv = document.createElement("div");
       controlsDiv.className = "session-controls";
       controlsDiv.appendChild(editBtn);
       controlsDiv.appendChild(delBtn);
       li.appendChild(titleSpan);
       li.appendChild(controlsDiv);
+
       li.addEventListener("click", () => {
         localStorage.setItem("currentSessionId", session.id);
         location.reload();
@@ -258,13 +262,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     checkOrGenerateUserId().then(() => {
       console.log("User ID validation complete");
-      const userId = localStorage.getItem("uniqueUserId");
-      if (userId) {
-        registerUserIdWithServer(userId).catch(err => {
-          console.warn("Server registration failed:", err);
-          ensureLocalUserId();
-        });
-      }
     }).catch(err => {
       console.warn("Problem with user ID, using local fallback:", err);
       ensureLocalUserId();
@@ -283,9 +280,19 @@ document.addEventListener("DOMContentLoaded", () => {
     let userId = localStorage.getItem("uniqueUserId");
     if (!userId) {
       userId = generateRandomId();
+      let success = false;
+      if (!USE_LOCAL_FALLBACK) {
+        try {
+          success = await registerUserIdWithServer(userId);
+        } catch (err) {
+          console.warn("Server registration failed, using local fallback:", err);
+          success = true;
+        }
+      } else {
+        success = true;
+      }
       localStorage.setItem("uniqueUserId", userId);
     }
-    await registerUserIdWithServer(userId);
     return userId;
   }
 
@@ -295,56 +302,56 @@ document.addEventListener("DOMContentLoaded", () => {
       await new Promise(resolve => setTimeout(resolve, 100));
       return true;
     }
-    const storedToken = localStorage.getItem("userToken");
     try {
-      console.log("Attempting to register userId:", userId, "with token:", storedToken);
       const response = await fetch(`${SERVER_URL}/api/registerUser`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, token: storedToken })
+        body: JSON.stringify({ userId })
       });
-      if (!response.ok) throw new Error(`Server error: ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
       const data = await response.json();
-      if (data.token) localStorage.setItem("userToken", data.token);
-      return data.status === "registered" || data.status ==="exists";
+      return data.status === "registered" || data.status === "exists";
     } catch (err) {
-      console.warn("Server registration failed:", err);
-      return false;
+      console.error("Failed to register user with server:", err);
+      throw err;
     }
   }
 
   function generateRandomId() {
-    return (Math.random().toString(36) + Date.now().toString(36)).substr(2, 20).toLowerCase().replace(/[^a-z0-9]/g, '');
+    return Math.random().toString(36).substr(2, 9);
   }
 
   function startVisitorCountPolling() {
-    updateVisitorCount();
-    setInterval(() => {
-      updateVisitorCount();
-    }, 60000);
+    const visitorCountDisplay = document.getElementById("visitor-count-display");
+    if (!visitorCountDisplay) return;
+    fetchVisitorCount().then((count) => {
+      visitorCountDisplay.textContent = count.toString();
+    }).catch((err) => {
+      visitorCountDisplay.textContent = "Offline";
+      console.warn("Failed to get visitor count:", err);
+    });
   }
 
-  async function updateVisitorCount() {
-    const visitorDisplay = document.getElementById("visitor-count-display");
-    if (!visitorDisplay) return;
+  async function fetchVisitorCount() {
     if (USE_LOCAL_FALLBACK) {
-      visitorDisplay.textContent = "404";
-      return;
+      return 1234;
     }
     try {
-      console.log("Fetching visitor count from:", SERVER_URL + "/api/visitorCount");
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
-      const response = await fetch(`${SERVER_URL}/api/visitorCount`, {
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-      if (!response.ok) throw new Error(`Server error: ${response.status}`);
+      const response = await fetch(`${SERVER_URL}/api/visitorCount`);
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
       const data = await response.json();
-      visitorDisplay.textContent = data.count.toLocaleString();
+      if (data && typeof data.count === "number") {
+        return data.count;
+      } else {
+        throw new Error("Invalid data format");
+      }
     } catch (err) {
-      console.warn("Error fetching visitor count, using fallback:", err);
-      visitorDisplay.textContent = "404";
+      console.error("Failed to fetch visitor count:", err);
+      throw err;
     }
   }
 });

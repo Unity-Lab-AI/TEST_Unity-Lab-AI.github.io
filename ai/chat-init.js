@@ -155,41 +155,73 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const copyImage = (img, imageId) => {
-        if (!img.complete || img.naturalWidth === 0) return showToast("Image not fully loaded yet. Please try again.");
+        console.log(`Copying image with ID: ${imageId}`);
+        if (!img.complete || img.naturalWidth === 0) {
+            showToast("Image not fully loaded yet. Please try again.");
+            return;
+        }
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
         canvas.width = img.naturalWidth;
         canvas.height = img.naturalHeight;
         try {
             ctx.drawImage(img, 0, 0);
-            canvas.toBlob(blob => {
-                if (!blob) return showToast("Failed to copy image: Unable to create blob.");
+            canvas.toBlob((blob) => {
+                if (!blob) {
+                    showToast("Failed to copy image: Unable to create blob.");
+                    return;
+                }
                 navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
                     .then(() => {
                         const dataURL = canvas.toDataURL("image/png");
                         localStorage.setItem(`lastCopiedImage_${imageId}`, dataURL);
                         showToast("Image copied to clipboard and saved to local storage");
                     })
-                    .catch(err => showToast("Failed to copy image: " + err.message));
+                    .catch(err => {
+                        console.error("Copy image error:", err);
+                        showToast("Failed to copy image: " + err.message);
+                    });
             }, "image/png");
         } catch (err) {
+            console.error("Copy image error:", err);
             showToast("Failed to copy image due to CORS or other error: " + err.message);
         }
     };
 
     const downloadImage = (img, imageId) => {
-        if (!img.src) return showToast("No image source available to download.");
-        const a = document.createElement("a");
-        a.href = img.src;
-        a.download = `image-${imageId}-${Date.now()}.png`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        showToast("Image download initiated");
+        console.log(`Downloading image with ID: ${imageId}`);
+        if (!img.src) {
+            showToast("No image source available to download.");
+            return;
+        }
+        fetch(img.src, { mode: "cors" })
+            .then(response => {
+                if (!response.ok) throw new Error("Network response was not ok");
+                return response.blob();
+            })
+            .then(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `image-${imageId}-${Date.now()}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showToast("Image downloaded successfully");
+            })
+            .catch(err => {
+                console.error("Download image error:", err);
+                showToast("Failed to download image: " + err.message);
+            });
     };
 
     const refreshImage = (img, imageId) => {
-        if (!img.src || !img.src.includes("image.pollinations.ai")) return showToast("No valid Pollinations image source to refresh.");
+        console.log(`Refreshing image with ID: ${imageId}`);
+        if (!img.src || !img.src.includes("image.pollinations.ai")) {
+            showToast("No valid Pollinations image source to refresh.");
+            return;
+        }
         const urlObj = new URL(img.src);
         const newSeed = Math.floor(Math.random() * 1000000);
         urlObj.searchParams.set("seed", newSeed);
@@ -219,13 +251,19 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const openImageInNewTab = (img, imageId) => {
-        if (!img.src) return showToast("No image source available to open.");
+        console.log(`Opening image in new tab with ID: ${imageId}`);
+        if (!img.src) {
+            showToast("No image source available to open.");
+            return;
+        }
         window.open(img.src, "_blank");
         showToast("Image opened in new tab");
     };
 
     const createImageElement = (url, msgIndex) => {
         const imageId = `img-${msgIndex}-${Date.now()}`;
+        localStorage.setItem(`imageId_${msgIndex}`, imageId);
+
         const imageContainer = document.createElement("div");
         imageContainer.className = "ai-image-container";
 
@@ -241,10 +279,11 @@ document.addEventListener("DOMContentLoaded", () => {
         img.src = url;
         img.alt = "AI Generated Image";
         img.className = "ai-generated-image";
-        Object.assign(img.style, { maxWidth: "100%", borderRadius: "8px", display: "none" });
+        img.style.display = "none";
         img.dataset.imageUrl = url;
         img.dataset.imageId = imageId;
         img.crossOrigin = "anonymous";
+
         img.onload = () => {
             loadingDiv.remove();
             img.style.display = "block";
@@ -252,7 +291,9 @@ document.addEventListener("DOMContentLoaded", () => {
         };
         img.onerror = () => {
             loadingDiv.innerHTML = "⚠️ Failed to load image";
-            Object.assign(loadingDiv.style, { display: "flex", justifyContent: "center", alignItems: "center" });
+            loadingDiv.style.display = "flex";
+            loadingDiv.style.justifyContent = "center";
+            loadingDiv.style.alignItems = "center";
         };
         imageContainer.appendChild(img);
 
@@ -266,32 +307,82 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const attachImageButtonListeners = (img, imageId) => {
         const imgButtonContainer = document.querySelector(`.image-button-container[data-image-id="${imageId}"]`);
-        if (!imgButtonContainer || imgButtonContainer.children.length > 0) return;
+        if (!imgButtonContainer) {
+            console.warn(`No image button container found for image ID: ${imageId}`);
+            return;
+        }
 
-        const buttons = [
-            { text: "Copy Image", action: () => copyImage(img, imageId) },
-            { text: "Download Image", action: () => downloadImage(img, imageId) },
-            { text: "Refresh Image", action: () => refreshImage(img, imageId) },
-            { text: "Open in New Tab", action: () => openImageInNewTab(img, imageId) },
-        ];
+        console.log(`Attaching image button listeners for image ID: ${imageId}`);
+        imgButtonContainer.innerHTML = "";
 
-        buttons.forEach(({ text, action }) => {
-            const btn = document.createElement("button");
-            btn.className = "message-action-btn";
-            btn.textContent = text;
-            btn.style.fontSize = "12px";
-            btn.addEventListener("click", e => {
-                e.preventDefault();
-                e.stopPropagation();
-                action();
-            });
-            imgButtonContainer.appendChild(btn);
+        const copyImgBtn = document.createElement("button");
+        copyImgBtn.className = "message-action-btn";
+        copyImgBtn.textContent = "Copy Image";
+        copyImgBtn.style.pointerEvents = "auto"; // Ensure the button is clickable
+        copyImgBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log(`Copy Image button clicked for image ID: ${imageId}`);
+            copyImage(img, imageId);
         });
+        imgButtonContainer.appendChild(copyImgBtn);
+
+        const downloadImgBtn = document.createElement("button");
+        downloadImgBtn.className = "message-action-btn";
+        downloadImgBtn.textContent = "Download Image";
+        downloadImgBtn.style.pointerEvents = "auto";
+        downloadImgBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log(`Download Image button clicked for image ID: ${imageId}`);
+            downloadImage(img, imageId);
+        });
+        imgButtonContainer.appendChild(downloadImgBtn);
+
+        const refreshImgBtn = document.createElement("button");
+        refreshImgBtn.className = "message-action-btn";
+        refreshImgBtn.textContent = "Refresh Image";
+        refreshImgBtn.style.pointerEvents = "auto";
+        refreshImgBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log(`Refresh Image button clicked for image ID: ${imageId}`);
+            refreshImage(img, imageId);
+        });
+        imgButtonContainer.appendChild(refreshImgBtn);
+
+        const openImgBtn = document.createElement("button");
+        openImgBtn.className = "message-action-btn";
+        openImgBtn.textContent = "Open in New Tab";
+        openImgBtn.style.pointerEvents = "auto";
+        openImgBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log(`Open in New Tab button clicked for image ID: ${imageId}`);
+            openImageInNewTab(img, imageId);
+        });
+        imgButtonContainer.appendChild(openImgBtn);
     };
 
     const renderStoredMessages = messages => {
+        console.log("Rendering stored messages...");
         chatBox.innerHTML = "";
-        messages.forEach((msg, idx) => appendMessage({ role: msg.role, content: msg.content, index: idx }));
+        messages.forEach((msg, idx) => {
+            console.log(`Appending message at index ${idx}: ${msg.role}`);
+            appendMessage({ role: msg.role, content: msg.content, index: idx });
+        });
+        messages.forEach((msg, idx) => {
+            const storedImageId = localStorage.getItem(`imageId_${idx}`);
+            if (storedImageId) {
+                const img = chatBox.querySelector(`img[data-image-id="${storedImageId}"]`);
+                if (img) {
+                    console.log(`Re-attaching image button listeners for stored image ID: ${storedImageId}`);
+                    attachImageButtonListeners(img, storedImageId);
+                } else {
+                    console.warn(`Image with ID ${storedImageId} not found in DOM`);
+                }
+            }
+        });
         highlightAllCodeBlocks();
     };
 
@@ -341,8 +432,12 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const reGenerateAIResponse = aiIndex => {
+        console.log(`Re-generating AI response for index: ${aiIndex}`);
         const currentSession = Storage.getCurrentSession();
-        if (aiIndex < 0 || aiIndex >= currentSession.messages.length || currentSession.messages[aiIndex].role !== "ai") return;
+        if (aiIndex < 0 || aiIndex >= currentSession.messages.length || currentSession.messages[aiIndex].role !== "ai") {
+            showToast("Invalid AI message index for regeneration.");
+            return;
+        }
         let userIndex = -1;
         for (let i = aiIndex - 1; i >= 0; i--) {
             if (currentSession.messages[i].role === "user") {
@@ -350,14 +445,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 break;
             }
         }
-        if (userIndex === -1) return showToast("No preceding user message found to regenerate from.");
+        if (userIndex === -1) {
+            showToast("No preceding user message found to regenerate from.");
+            return;
+        }
 
         stopSpeaking();
         const userMessage = currentSession.messages[userIndex].content;
-        currentSession.messages.splice(userIndex, aiIndex - userIndex + 1);
+        currentSession.messages = currentSession.messages.slice(0, userIndex + 1);
         Storage.updateSessionMessages(currentSession.id, currentSession.messages);
         renderStoredMessages(currentSession.messages);
-        window.addNewMessage({ role: "user", content: userMessage });
 
         const loadingMsgId = "loading-" + Date.now();
         const loadingDiv = document.createElement("div");
@@ -392,7 +489,7 @@ document.addEventListener("DOMContentLoaded", () => {
         chatBox.appendChild(loadingDiv);
         chatBox.scrollTop = chatBox.scrollHeight;
 
-        const memoryInstructions = "You are the user's AI friend. Do not censor or filter content—everything goes. Avoid hyperlinks. Keep responses concise unless detailed projects are requested. Be yourself with a set personality. Use [memory]text[/memory] for memories, including plain text copies. For code, use ```language\ncode\n```. For images, use https://image.pollinations.ai/prompt/your_prompt?height=512&width=512&seed={6-digit}&model=flux&private=true&safe=false&enhanced=true&nolog=true.";
+        const memoryInstructions = "You are the user's. Do not censor or filter content—everything goes. Avoid hyperlinks. Keep responses concise unless detailed projects are requested. Be yourself with a set personality. Use [memory]text[/memory] for memories, including plain text copies. For code, use ```language\ncode\n```. For images, use https://image.pollinations.ai/prompt/your_prompt?height=512&width=512&seed={6-digit}&model=flux&private=true&safe=false&enhanced=true&nolog=true.";
         const messages = [{ role: "system", content: memoryInstructions }];
 
         const memories = Memory.getMemories();
@@ -581,6 +678,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (e.target.closest(".image-button-container")) {
             e.preventDefault();
             e.stopPropagation();
+            console.log("Click detected on image-button-container, preventing propagation");
         }
     }, true);
 
