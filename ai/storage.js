@@ -1,6 +1,11 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const SERVER_URL = "https://vps.unityailab.online:3000";
-  const USE_LOCAL_FALLBACK = true;
+  /* ─── Cloudflare‑only setup (no VPS) ───────────────────────────── */
+  const USE_LOCAL_FALLBACK = false;              // set true only for offline dev
+  /* visitor‑counter cache */
+  const VISITOR_CACHE_MS = 5 * 60 * 1000;        // 5 minutes
+  const VISITOR_TS_KEY   = "visitor_ts";
+  const VISITOR_CNT_KEY  = "visitor_cnt";
+  /* ──────────────────────────────────────────────────────────────── */
 
   const sessionListEl = document.getElementById("session-list");
   let sessions = loadSessions();
@@ -255,6 +260,8 @@ document.addEventListener("DOMContentLoaded", () => {
     location.reload();
   }
 
+  /* ───── user‑ID registration (now via /api/registerUser) ───── */
+
   function initUserChecks() {
     let firstLaunch = localStorage.getItem("firstLaunch");
     if (firstLaunch === null) {
@@ -303,7 +310,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return true;
     }
     try {
-      const response = await fetch(`${SERVER_URL}/api/registerUser`, {
+      const response = await fetch("/api/registerUser", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId })
@@ -323,35 +330,51 @@ document.addEventListener("DOMContentLoaded", () => {
     return Math.random().toString(36).substr(2, 9);
   }
 
+  /* ───── Cloudflare visitor‑counter ───── */
+
   function startVisitorCountPolling() {
     const visitorCountDisplay = document.getElementById("visitor-count-display");
     if (!visitorCountDisplay) return;
-    fetchVisitorCount().then((count) => {
-      visitorCountDisplay.textContent = count.toString();
-    }).catch((err) => {
-      visitorCountDisplay.textContent = "Offline";
-      console.warn("Failed to get visitor count:", err);
-    });
+
+    async function update() {
+      try {
+        const count = await fetchVisitorCountCached();
+        visitorCountDisplay.textContent = prettyNumber(count);
+      } catch (err) {
+        visitorCountDisplay.textContent = "Offline";
+        console.warn("Failed to get visitor count:", err);
+      }
+    }
+
+    update();
+    setInterval(update, 60_000); // refresh every minute
   }
 
-  async function fetchVisitorCount() {
+  async function fetchVisitorCountCached() {
+    const now = Date.now();
+    const ts  = +localStorage.getItem(VISITOR_TS_KEY) || 0;
+    if (now - ts < VISITOR_CACHE_MS) {
+      return +localStorage.getItem(VISITOR_CNT_KEY);
+    }
+
     if (USE_LOCAL_FALLBACK) {
-      return 1234;
+      const stub = 1234;
+      localStorage.setItem(VISITOR_TS_KEY, now);
+      localStorage.setItem(VISITOR_CNT_KEY, stub);
+      return stub;
     }
-    try {
-      const response = await fetch(`${SERVER_URL}/api/visitorCount`);
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
-      }
-      const data = await response.json();
-      if (data && typeof data.count === "number") {
-        return data.count;
-      } else {
-        throw new Error("Invalid data format");
-      }
-    } catch (err) {
-      console.error("Failed to fetch visitor count:", err);
-      throw err;
-    }
+
+    const { total } = await fetch("/api/visitors").then(r => r.json());
+    localStorage.setItem(VISITOR_TS_KEY, now);
+    localStorage.setItem(VISITOR_CNT_KEY, total);
+    return total;
+  }
+
+  function prettyNumber(n) {
+    const abs = Math.abs(n);
+    if (abs >= 1e9)  return (n / 1e9).toFixed(abs >= 1e11 ? 0 : 2) + "B";
+    if (abs >= 1e6)  return (n / 1e6).toFixed(abs >= 1e8  ? 0 : 2) + "M";
+    if (abs >= 1e3)  return (n / 1e3).toFixed(abs >= 1e5  ? 0 : 2) + "K";
+    return n.toString();
   }
 });
