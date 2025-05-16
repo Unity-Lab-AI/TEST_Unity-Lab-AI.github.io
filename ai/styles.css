@@ -784,85 +784,181 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   z-index: 0;
+  transition: opacity var(--transition-duration, 1s) ease;
 }
 
 .screensaver-thumbnails {
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
   display: flex;
-  gap: 10px;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 12px;
   overflow-x: auto;
-  max-width: 90%;
-  padding: 5px;
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: 10px;
-  z-index: 1;
-  opacity: 1;
+  width: 100%;
+  height: 120px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 0;
+  z-index: 2;
   transition: opacity 0.3s ease;
+  scrollbar-width: thin;
+  scrollbar-color: #707070 #333333;
+  white-space: nowrap;
+  direction: ltr;
+  scroll-behavior: smooth;
 }
 
-.screensaver:not(:hover) .screensaver-thumbnails {
-  opacity: 0.3;
+.screensaver-thumbnails::-webkit-scrollbar {
+  height: 8px;
+}
+
+.screensaver-thumbnails::-webkit-scrollbar-track {
+  background: #333333;
+  border-radius: 4px;
+}
+
+.screensaver-thumbnails::-webkit-scrollbar-thumb {
+  background: #707070;
+  border-radius: 4px;
+}
+
+.screensaver-thumbnails img.thumbnail {
+  width: 160px;
+  height: 90px;
+  object-fit: cover;
+  cursor: pointer;
+  border: 3px solid transparent;
+  border-radius: 8px;
+  transition: border 0.3s, transform 0.2s;
+  flex-shrink: 0;
+  display: inline-block;
+  opacity: 1;
+}
+
+.screensaver-thumbnails img.thumbnail:hover {
+  border: 3px solid #00ffcc;
+  transform: scale(1.05);
+}
+
+.screensaver-thumbnails img.thumbnail.selected {
+  border: 3px solid #ffcc00;
 }
 
 .screensaver-controls {
-  position: absolute;
-  bottom: 20px;
+  position: fixed;
+  bottom: 140px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.7);
-  padding: 15px;
-  border-radius: 10px;
-  width: 80%;
-  max-width: 800px;
-  z-index: 1;
-  opacity: 1;
-  transition: opacity 0.3s ease;
+  background: linear-gradient(135deg, rgba(30, 30, 30, 0.9), rgba(50, 50, 50, 0.9));
+  padding: 20px;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 900px;
+  z-index: 2;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  border: 1px solid #00ffcc;
 }
 
-.screensaver:not(:hover) .screensaver-controls {
-  opacity: 0.3;
+.screensaver-controls:hover {
+  transform: translateX(-50%) scale(1.02);
 }
 
-.screensaver-thumbnails img {
-  width: 100px;
-  height: 100px;
-  object-fit: cover;
-  cursor: pointer;
-  border: 2px solid transparent;
-  transition: border 0.3s;
+.screensaver:not(:hover) .screensaver-controls,
+.screensaver:not(:hover) .screensaver-thumbnails {
+  opacity: 0.5;
 }
 
-.screensaver-thumbnails img:hover {
-  border: 2px solid white;
+.screensaver-controls.hidden-panel,
+.screensaver-thumbnails.hidden-panel {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(20px);
 }
 
-.screensaver-thumbnails img.selected {
-  border: 2px solid yellow;
+.screensaver-settings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.screensaver-settings label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.9rem;
+  color: #e0e0e0;
 }
 
 .screensaver-settings label[for="screensaver-prompt"] {
   grid-column: 1 / -1;
 }
 
-.screensaver-settings textarea {
+.screensaver-settings textarea,
+.screensaver-settings input,
+.screensaver-settings select {
   width: 100%;
-  min-height: 60px;
   padding: 8px;
-  border-radius: 5px;
-  border: 1px solid #505050;
+  border-radius: 8px;
+  border: 1px solid #707070;
   background-color: #333333;
   color: #e0e0e0;
-  font-size: 14px;
-  resize: vertical;
-  overflow-y: auto;
+  font-size: 0.9rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.screensaver-controls.hidden-panel {
-  opacity: 0;
+.screensaver-settings textarea:focus,
+.screensaver-settings input:focus,
+.screensaver-settings select:focus {
+  border-color: #00ffcc;
+  box-shadow: 0 0 5px rgba(0, 255, 204, 0.3);
+  outline: none;
+}
+
+.screensaver-settings textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.screensaver-btn-group {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.screensaver-btn {
+  background: linear-gradient(135deg, #404040, #505050);
+  color: #e0e0e0;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+.screensaver-btn:hover {
+  background: linear-gradient(135deg, #505050, #606060);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 255, 204, 0.2);
+}
+
+.screensaver-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+.screensaver canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
   pointer-events: none;
 }
