@@ -31,7 +31,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const clearUserDataBtn = document.getElementById("clear-user-data-btn");
     const toggleSimpleModeBtn = document.getElementById("toggle-simple-mode");
 
-    // Ensure we have a <link id="theme-link"> for dynamic theme loading
     let themeLinkElement = document.getElementById("theme-link");
     if (!themeLinkElement) {
         themeLinkElement = document.createElement("link");
@@ -109,7 +108,6 @@ document.addEventListener("DOMContentLoaded", () => {
         changeTheme(themeSelectSettings.value);
     });
 
-    // Fetch the list of pollinations text models, populate model-select
     function fetchPollinationsModels() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -128,15 +126,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 return res.json();
             })
             .then(models => {
-                if (!Array.isArray(models)) {
-                    console.error("Models response is not an array:", models);
-                    throw new Error("Invalid models response");
-                }
                 modelSelect.innerHTML = "";
                 let hasValidModel = false;
 
+                if (!Array.isArray(models) || models.length === 0) {
+                    console.error("Models response is not a valid array or is empty:", models);
+                    throw new Error("Invalid models response");
+                }
+
                 models.forEach(m => {
-                    if (m.type !== "safety" && m.name) {
+                    if (m && m.name && m.type !== "safety") {
                         const opt = document.createElement("option");
                         opt.value = m.name;
                         opt.textContent = m.description || m.name;
@@ -153,16 +152,18 @@ document.addEventListener("DOMContentLoaded", () => {
                         opt.title = tooltip;
                         modelSelect.appendChild(opt);
                         hasValidModel = true;
+                    } else {
+                        console.warn("Skipping invalid model entry:", m);
                     }
                 });
 
                 if (!hasValidModel) {
                     const fallbackOpt = document.createElement("option");
                     fallbackOpt.value = "unity";
-                    fallbackOpt.textContent = "Unity (Fallback)";
+                    fallbackOpt.textContent = "Unity (Fallback - No Valid Models)";
                     modelSelect.appendChild(fallbackOpt);
                     modelSelect.value = "unity";
-                    console.warn("No valid models returned from API. Using Unity fallback.");
+                    console.warn("No valid models found. Using Unity fallback.");
                 }
 
                 const currentSession = Storage.getCurrentSession();
@@ -184,6 +185,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             })
             .catch(err => {
+                clearTimeout(timeoutId);
                 if (err.name === "AbortError") {
                     console.error("Fetch timed out");
                 } else {
@@ -234,7 +236,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Donation modal
     donationOpenBtn.addEventListener("click", () => {
         donationModal.classList.remove("hidden");
     });
@@ -242,10 +243,8 @@ document.addEventListener("DOMContentLoaded", () => {
         donationModal.classList.add("hidden");
     });
 
-    // Settings modal
     openSettingsBtn.addEventListener("click", () => {
         settingsModal.classList.remove("hidden");
-        // Populate voices if available:
         if (window._chatInternals && window._chatInternals.voices && window._chatInternals.voices.length > 0) {
             window._chatInternals.populateAllVoiceDropdowns();
         }
@@ -254,7 +253,6 @@ document.addEventListener("DOMContentLoaded", () => {
         settingsModal.classList.add("hidden");
     });
 
-    // Personalization
     if (openPersonalizationBtn) {
         openPersonalizationBtn.addEventListener("click", () => {
             openPersonalizationModal();
@@ -336,7 +334,6 @@ document.addEventListener("DOMContentLoaded", () => {
         Memory.addMemoryEntry(memoryText);
     }
 
-    // Memory Manager
     openMemoryManagerBtn.addEventListener("click", () => {
         memoryModal.classList.remove("hidden");
         loadMemoryEntries();
@@ -420,7 +417,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Clear Chat Sessions
     if (clearChatSessionsBtn) {
         clearChatSessionsBtn.addEventListener("click", () => {
             if (confirm("Are you sure you want to clear ALL chat sessions? This cannot be undone.")) {
@@ -431,7 +427,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Clear ALL user data
     if (clearUserDataBtn) {
         clearUserDataBtn.addEventListener("click", () => {
             if (confirm("This will permanently delete ALL your data (sessions, memories, settings). Are you absolutely sure?")) {
@@ -440,7 +435,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Simple Mode
     if (toggleSimpleModeBtn) {
         toggleSimpleModeBtn.addEventListener("click", () => {
             if (typeof window.openSimpleMode === "function") {

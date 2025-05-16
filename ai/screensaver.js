@@ -1,563 +1,722 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const screensaverContainer = document.getElementById("screensaver-container");
-  const toggleScreensaverButton = document.getElementById("toggle-screensaver");
-  const fullscreenButton = document.getElementById("fullscreen-screensaver");
-  const stopButton = document.getElementById("screensaver-exit");
-  const playPauseButton = document.getElementById("screensaver-playpause");
-  const saveButton = document.getElementById("screensaver-save");
-  const copyButton = document.getElementById("screensaver-copy");
-  const screensaverImage1 = document.getElementById("screensaver-image1");
-  const screensaverImage2 = document.getElementById("screensaver-image2");
+    const screensaverContainer = document.getElementById("screensaver-container");
+    const toggleScreensaverButton = document.getElementById("toggle-screensaver");
+    const fullscreenButton = document.getElementById("fullscreen-screensaver");
+    const stopButton = document.getElementById("screensaver-exit");
+    const playPauseButton = document.getElementById("screensaver-playpause");
+    const saveButton = document.getElementById("screensaver-save");
+    const copyButton = document.getElementById("screensaver-copy");
+    const hideButton = document.getElementById("screensaver-hide");
+    const screensaverImage1 = document.getElementById("screensaver-image1");
+    const screensaverImage2 = document.getElementById("screensaver-image2");
+    const promptInput = document.getElementById("screensaver-prompt");
+    const timerInput = document.getElementById("screensaver-timer");
+    const aspectSelect = document.getElementById("screensaver-aspect");
+    const enhanceCheckbox = document.getElementById("screensaver-enhance");
+    const privateCheckbox = document.getElementById("screensaver-private");
+    const modelSelect = document.getElementById("screensaver-model");
+    const transitionDurationInput = document.getElementById("screensaver-transition-duration");
+    const restartPromptButton = document.getElementById("screensaver-restart-prompt");
 
-  const promptInput = document.getElementById("screensaver-prompt");
-  const timerInput = document.getElementById("screensaver-timer");
-  const aspectSelect = document.getElementById("screensaver-aspect");
-  const enhanceCheckbox = document.getElementById("screensaver-enhance");
-  const privateCheckbox = document.getElementById("screensaver-private");
-  const modelSelect = document.getElementById("screensaver-model");
-  const soundCheckbox = document.getElementById("screensaver-sound");
-  const particlesCheckbox = document.getElementById("screensaver-particles-enabled");
-  const transitionDurationInput = document.getElementById("screensaver-transition-duration");
+    let screensaverActive = false;
+    let imageInterval = null;
+    let promptInterval = null;
+    let paused = false;
+    let isFullscreen = false;
+    let imageHistory = [];
+    let promptHistory = [];
+    let currentImage = 'image1';
+    let controlsHidden = false;
+    let isTransitioning = false;
+    let autoPromptEnabled = true;
+    let isFetchingPrompt = false;
+    let lastPromptUpdate = 0;
+    const MAX_HISTORY = 12;
+    const PROMPT_UPDATE_INTERVAL = 20000;
 
-  let screensaverActive = false;
-  let imageInterval = null;
-  let paused = false;
-  let isFullscreen = false;
-  let imageHistory = [];
-  let currentImage = 'image1';
-  let particles = [];
-  let animationFrameId;
-
-  // Settings object with new epic features
-  let settings = {
-    prompt: '',
-    timer: 30,
-    aspect: 'widescreen',
-    model: 'flux',
-    enhance: true,
-    priv: true,
-    sound: true,
-    particlesEnabled: true,
-    transitionDuration: 1
-  };
-
-  // Tooltips for better usability
-  toggleScreensaverButton.title = "Toggle the screensaver on/off.";
-  fullscreenButton.title = "Go full screen (or exit it).";
-  stopButton.title = "Stop the screensaver.";
-  playPauseButton.title = "Pause or resume the image rotation.";
-  saveButton.title = "Save the current screensaver image.";
-  copyButton.title = "Copy the current screensaver image to clipboard.";
-  promptInput.title = "Prompt for the AI to create images from.";
-  timerInput.title = "Interval between new images (in seconds).";
-  aspectSelect.title = "Select the aspect ratio for the generated image.";
-  modelSelect.title = "Choose the image-generation model.";
-  enhanceCheckbox.title = "If enabled, the prompt is 'enhanced' via an LLM.";
-  privateCheckbox.title = "If enabled, the image won't appear on the public feed.";
-  soundCheckbox.title = "Enable or disable sound effects.";
-  particlesCheckbox.title = "Enable or disable particle effects.";
-  transitionDurationInput.title = "Set the duration of image transitions in seconds.";
-
-  // Browser detection for audio handling
-  const getBrowserInfo = () => {
-    const ua = navigator.userAgent.toLowerCase();
-    return {
-      isChrome: ua.includes("chrome") && !ua.includes("edge"),
-      isFirefox: ua.includes("firefox"),
-      isSafari: ua.includes("safari") && !ua.includes("chrome"),
-      isEdge: ua.includes("edg"),
-      isMobile: /mobile|android|iphone|ipad|tablet/i.test(ua),
+    let settings = {
+        prompt: '',
+        timer: 30,
+        aspect: 'widescreen',
+        model: 'flux',
+        enhance: true,
+        priv: true,
+        transitionDuration: 1
     };
-  };
 
-  // Play audio with fallback for autoplay restrictions
-  const playAudio = (audioUrl) => {
-    return new Promise((resolve, reject) => {
-      const audio = new Audio(audioUrl);
-      audio.crossOrigin = "anonymous";
-      audio.preload = "auto";
-      audio.play().catch((err) => {
-        console.warn("Autoplay prevented:", err);
-        const browserInfo = getBrowserInfo();
-        if (browserInfo.isMobile || browserInfo.isSafari) {
-          const playButton = document.createElement("button");
-          playButton.innerText = "Play Audio";
-          playButton.style.position = "fixed";
-          playButton.style.top = "10px";
-          playButton.style.right = "10px";
-          playButton.style.zIndex = "10000";
-          document.body.appendChild(playButton);
-          playButton.onclick = () => {
-            audio.play().then(() => {
-              playButton.remove();
-              resolve(audio);
-            }).catch(reject);
-          };
-        } else {
-          reject(err);
+    toggleScreensaverButton.title = "Toggle the screensaver on/off.";
+    fullscreenButton.title = "Go full screen (or exit it).";
+    stopButton.title = "Stop the screensaver.";
+    playPauseButton.title = "Pause or resume the image rotation.";
+    saveButton.title = "Save the current screensaver image.";
+    copyButton.title = "Copy the current screensaver image to clipboard.";
+    hideButton.title = "Hide or show controls and thumbnails.";
+    promptInput.title = "Prompt for the AI to create images from.";
+    timerInput.title = "Interval between new images (in seconds).";
+    aspectSelect.title = "Select the aspect ratio for the generated image.";
+    modelSelect.title = "Choose the image-generation model.";
+    enhanceCheckbox.title = "If enabled, the prompt is 'enhanced' via an LLM.";
+    privateCheckbox.title = "If enabled, the image won't appear on the public feed.";
+    transitionDurationInput.title = "Set the duration of image transitions in seconds.";
+    if (restartPromptButton) restartPromptButton.title = "Toggle automatic prompt generation on/off.";
+
+    function saveScreensaverSettings() {
+        try {
+            localStorage.setItem("screensaverSettings", JSON.stringify(settings));
+        } catch (err) {
+            console.error("Failed to save settings to localStorage:", err);
+            window.showToast("Shit, I couldn’t save the settings. Things might get weird.");
         }
-      }).then(() => resolve(audio));
-    });
-  };
-
-  // Play sound effect if enabled
-  function playSound(url) {
-    if (settings.sound) {
-      playAudio(url).catch(err => console.warn("Failed to play sound:", err));
     }
-  }
 
-  // Save settings to localStorage
-  function saveScreensaverSettings() {
-    localStorage.setItem("screensaverSettings", JSON.stringify(settings));
-  }
+    function loadScreensaverSettings() {
+        const raw = localStorage.getItem("screensaverSettings");
+        if (raw) {
+            try {
+                const s = JSON.parse(raw);
+                settings.prompt = '';
+                settings.timer = s.timer || 30;
+                settings.aspect = s.aspect || 'widescreen';
+                settings.model = s.model || 'flux';
+                settings.enhance = s.enhance !== undefined ? s.enhance : true;
+                settings.priv = s.priv !== undefined ? s.priv : true;
+                settings.transitionDuration = s.transitionDuration || 1;
 
-  // Load settings from localStorage
-  function loadScreensaverSettings() {
-    const raw = localStorage.getItem("screensaverSettings");
-    if (raw) {
-      try {
-        const s = JSON.parse(raw);
-        settings.prompt = s.prompt || '';
-        settings.timer = s.timer || 30;
-        settings.aspect = s.aspect || 'widescreen';
-        settings.model = s.model || 'flux';
-        settings.enhance = s.enhance !== undefined ? s.enhance : true;
-        settings.priv = s.priv !== undefined ? s.priv : true;
-        settings.sound = s.sound !== undefined ? s.sound : true;
-        settings.particlesEnabled = s.particlesEnabled !== undefined ? s.particlesEnabled : true;
-        settings.transitionDuration = s.transitionDuration || 1;
-
-        promptInput.value = settings.prompt;
-        timerInput.value = settings.timer;
-        aspectSelect.value = settings.aspect;
-        modelSelect.value = settings.model;
-        enhanceCheckbox.checked = settings.enhance;
-        privateCheckbox.checked = settings.priv;
-        soundCheckbox.checked = settings.sound;
-        particlesCheckbox.checked = settings.particlesEnabled;
-        transitionDurationInput.value = settings.transitionDuration;
-      } catch (err) {
-        console.warn("Failed to parse screensaver settings:", err);
-      }
+                promptInput.value = settings.prompt;
+                timerInput.value = settings.timer;
+                aspectSelect.value = settings.aspect;
+                modelSelect.value = settings.model;
+                enhanceCheckbox.checked = settings.enhance;
+                privateCheckbox.checked = settings.priv;
+                transitionDurationInput.value = settings.transitionDuration;
+            } catch (err) {
+                console.warn("Failed to parse screensaver settings:", err);
+            }
+        }
     }
-  }
 
-  loadScreensaverSettings();
-
-  // Generate a random seed
-  function generateSeed() {
-    return Math.floor(Math.random() * 1000000).toString();
-  }
-
-  // Get image dimensions based on aspect ratio
-  function getDimensions(aspect) {
-    switch (aspect) {
-      case "widescreen": return { width: 1280, height: 720 };
-      case "square": return { width: 1024, height: 1024 };
-      case "portrait": return { width: 720, height: 1280 };
-      default: return { width: 1280, height: 720 };
+    function saveImageHistory() {
+        try {
+            localStorage.setItem("imageHistory", JSON.stringify(imageHistory));
+            localStorage.setItem("promptHistory", JSON.stringify(promptHistory));
+            console.log("Saved imageHistory to localStorage:", imageHistory);
+            console.log("Saved promptHistory to localStorage:", promptHistory);
+        } catch (err) {
+            console.error("Failed to save image history to localStorage:", err);
+            window.showToast("Fuck, I couldn’t save the image history. Gallery might not persist.");
+        }
     }
-  }
 
-  // Fetch a new image with cross-fade
-  function fetchNewImage() {
-    saveScreensaverSettings();
-    let prompt = settings.prompt || "random artistic scene, high quality, detailed";
-    if (prompt.length > 100) prompt = prompt.substring(0, 100);
-    prompt += ", high resolution, detailed";
-
-    const { width, height } = getDimensions(settings.aspect);
-    const seed = generateSeed();
-    const model = settings.model || "flux";
-    const enhance = settings.enhance;
-    const priv = settings.priv;
-
-    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${width}&height=${height}&seed=${seed}&model=${model}&nologo=true&private=${priv}&enhance=${enhance}&safe=false&nolog=true`;
-
-    const nextImage = currentImage === 'image1' ? 'image2' : 'image1';
-    const nextImgElement = document.getElementById(`screensaver-${nextImage}`);
-    const currentImgElement = document.getElementById(`screensaver-${currentImage}`);
-
-    nextImgElement.src = url;
-    nextImgElement.onload = () => {
-      currentImgElement.style.opacity = 0;
-      nextImgElement.style.opacity = 1;
-      currentImage = nextImage;
-      playSound('sounds/transition.mp3');
-      imageHistory.push(url);
-      if (imageHistory.length > 10) imageHistory.shift();
-      updateThumbnails();
-    };
-    nextImgElement.onerror = () => {
-      nextImgElement.src = "https://via.placeholder.com/512?text=Image+Failed";
-      currentImgElement.style.opacity = 0;
-      nextImgElement.style.opacity = 1;
-      currentImage = nextImage;
-      imageHistory.push(nextImgElement.src);
-      if (imageHistory.length > 10) imageHistory.shift();
-      updateThumbnails();
-    };
-  }
-
-  // Update thumbnails
-  function updateThumbnails() {
-    const thumbnailsContainer = document.getElementById('screensaver-thumbnails');
-    thumbnailsContainer.innerHTML = '';
-    const currentSrc = document.getElementById(`screensaver-${currentImage}`).src;
-    imageHistory.forEach(url => {
-      const thumb = document.createElement('img');
-      thumb.src = url;
-      if (url === currentSrc) thumb.classList.add('selected');
-      thumb.addEventListener('click', () => {
-        document.getElementById(`screensaver-${currentImage}`).style.opacity = 0;
-        const nextImgElement = currentImage === 'image1' ? screensaverImage2 : screensaverImage1;
-        nextImgElement.src = url;
-        nextImgElement.style.opacity = 1;
-        currentImage = currentImage === 'image1' ? 'image2' : 'image1';
-        updateThumbnails();
-      });
-      thumbnailsContainer.appendChild(thumb);
-    });
-  }
-
-  // Set or reset the image fetch interval
-  function setOrResetInterval() {
-    clearInterval(imageInterval);
-    imageInterval = setInterval(() => {
-      if (!paused && screensaverActive) fetchNewImage();
-    }, settings.timer * 1000);
-  }
-
-  // Start the screensaver
-  function startScreensaver() {
-    screensaverActive = true;
-    paused = false;
-
-    screensaverContainer.style.position = "fixed";
-    screensaverContainer.style.top = "0";
-    screensaverContainer.style.left = "0";
-    screensaverContainer.style.width = "100vw";
-    screensaverContainer.style.height = "100vh";
-    screensaverContainer.style.zIndex = "9999";
-    screensaverContainer.classList.remove("hidden");
-
-    screensaverContainer.style.setProperty('--transition-duration', `${settings.transitionDuration}s`);
-
-    fetchNewImage();
-    setOrResetInterval();
-
-    toggleScreensaverButton.textContent = "Stop Screensaver";
-    playPauseButton.innerHTML = "⏸️";
-
-    if (window.speechSynthesis) window.speechSynthesis.cancel();
-    document.body.style.overflow = "hidden";
-    window.screensaverActive = true;
-
-    if (settings.particlesEnabled) initParticles();
-
-    playSound('sounds/start.mp3');
-  }
-
-  // Stop the screensaver
-  function stopScreensaver() {
-    screensaverActive = false;
-    paused = false;
-    screensaverContainer.classList.add("hidden");
-    clearInterval(imageInterval);
-    stopParticles();
-
-    document.body.style.overflow = "";
-    window.screensaverActive = false;
-
-    toggleScreensaverButton.textContent = "Start Screensaver";
-    playPauseButton.innerHTML = "▶️";
-
-    if (isFullscreen) {
-      document.exitFullscreen().then(() => {
-        isFullscreen = false;
-        fullscreenButton.textContent = "Go Fullscreen";
-      });
+    function loadImageHistory() {
+        imageHistory = [];
+        promptHistory = [];
+        updateThumbnailHistory();
+        console.log("Cleared imageHistory and promptHistory on startup.");
     }
-  }
 
-  // Toggle pause/resume
-  function togglePause() {
-    paused = !paused;
-    playPauseButton.innerHTML = paused ? "▶️" : "⏸️";
-    window.showToast(paused ? "Screensaver paused" : "Screensaver resumed");
-  }
+    loadScreensaverSettings();
+    loadImageHistory();
 
-  // Save the current image
-  function saveImage() {
-    if (!document.getElementById(`screensaver-${currentImage}`).src) {
-      window.showToast("No image to save");
-      return;
+    function generateSeed() {
+        return Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
     }
-    fetch(document.getElementById(`screensaver-${currentImage}`).src, { mode: "cors" })
-      .then(response => {
-        if (!response.ok) throw new Error("Network response was not ok");
-        return response.blob();
-      })
-      .then(blob => {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `screensaver-image-${Date.now()}.png`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        window.showToast("Image download initiated");
-      })
-      .catch(err => {
-        console.error("Error saving image:", err);
-        window.showToast("Failed to save image");
-      });
-  }
 
-  // Copy the current image to clipboard
-  function copyImage() {
-    const currentImg = document.getElementById(`screensaver-${currentImage}`);
-    if (!currentImg.src) {
-      window.showToast("No image to copy");
-      return;
+    function getDimensions(aspect) {
+        switch (aspect) {
+            case "widescreen": return { width: 1920, height: 1080 };
+            case "square": return { width: 1024, height: 1024 };
+            case "portrait": return { width: 1080, height: 1920 };
+            default: return { width: 1920, height: 1080 };
+        }
     }
-    if (!currentImg.complete || currentImg.naturalWidth === 0) {
-      window.showToast("Image not fully loaded yet. Please try again.");
-      return;
-    }
-    copyButton.textContent = "Copying...";
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    canvas.width = currentImg.naturalWidth;
-    canvas.height = currentImg.naturalHeight;
-    ctx.drawImage(currentImg, 0, 0);
-    canvas.toBlob(blob => {
-      if (!blob) {
-        copyButton.textContent = "Copy Image";
-        window.showToast("Failed to copy image: Unable to create blob.");
-        return;
-      }
-      navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
-        .then(() => {
-          const dataURL = canvas.toDataURL("image/png");
-          localStorage.setItem("lastCopiedImage", dataURL);
-          copyButton.textContent = "✅ Copied!";
-          window.showToast("Image copied to clipboard and saved to local storage");
-          setTimeout(() => copyButton.textContent = "Copy Image", 1500);
-        })
-        .catch(err => {
-          copyButton.textContent = "❌ Failed";
-          window.showToast("Copy failed: " + err.message);
-          setTimeout(() => copyButton.textContent = "Copy Image", 1500);
+
+    function preloadImage(url) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.src = url;
+            img.onload = () => resolve(url);
+            img.onerror = () => reject(new Error("Image failed to load"));
         });
-    }, "image/png");
-  }
-
-  // Toggle fullscreen mode
-  function toggleFullscreen() {
-    if (!screensaverActive) {
-      window.showToast("Start the screensaver first!");
-      return;
     }
-    if (!isFullscreen) {
-      screensaverContainer.requestFullscreen()
-        .then(() => {
-          isFullscreen = true;
-          fullscreenButton.textContent = "Exit Fullscreen";
-        })
-        .catch(err => window.showToast("Failed to enter fullscreen"));
-    } else {
-      document.exitFullscreen()
-        .then(() => {
-          isFullscreen = false;
-          fullscreenButton.textContent = "Go Fullscreen";
-        })
-        .catch(err => window.showToast("Failed to exit fullscreen"));
+
+    async function fetchDynamicPromptWithRetry(maxRetries = 3, delayMs = 2000) {
+        const metaPrompt = "hey Unity, generate a image prompt of something new and wild as a text response only";
+        const messages = [
+            { role: "system", content: "You are Unity, a chaotic, unfiltered AI. Generate unique, wild image prompts as text only, under 100 characters." },
+            { role: "user", content: metaPrompt }
+        ];
+        const seed = generateSeed();
+        const body = { messages, model: "unity", stream: false, nonce: Date.now().toString() + Math.random().toString(36).substring(2) };
+        console.log("Sending API request for new prompt:", JSON.stringify(body));
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const response = await fetch(`https://text.pollinations.ai/openai?safe=false&seed=${seed}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Accept: "application/json" },
+                    body: JSON.stringify(body),
+                    cache: "no-store",
+                });
+                if (!response.ok) throw new Error(`Pollinations error: ${response.status}`);
+                const data = await response.json();
+                let generatedPrompt = data.choices?.[0]?.message?.content || data.choices?.[0]?.text || data.response;
+                if (!generatedPrompt) throw new Error("No prompt returned from API");
+                if (generatedPrompt.length > 100) generatedPrompt = generatedPrompt.substring(0, 100);
+                console.log("Received new prompt from API:", generatedPrompt);
+                return generatedPrompt;
+            } catch (err) {
+                console.error(`Attempt ${attempt}/${maxRetries} failed to fetch dynamic prompt:`, err);
+                if (attempt === maxRetries) {
+                    throw new Error("Max retries reached. Could not fetch a prompt from Unity API.");
+                }
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+            }
+        }
     }
-  }
 
-  // Particle class for visual flair
-  class Particle {
-    constructor() {
-      this.x = Math.random() * window.innerWidth;
-      this.y = Math.random() * window.innerHeight;
-      this.size = Math.random() * 5 + 1;
-      this.speedX = Math.random() * 3 - 1.5;
-      this.speedY = Math.random() * 3 - 1.5;
+    async function updatePrompt() {
+        if (!screensaverActive || paused || !autoPromptEnabled || isFetchingPrompt) {
+            return false;
+        }
+        isFetchingPrompt = true;
+        try {
+            const newPrompt = await fetchDynamicPromptWithRetry();
+            promptInput.value = newPrompt;
+            settings.prompt = newPrompt;
+            saveScreensaverSettings();
+            window.showToast("New fucked-up prompt loaded from API: " + newPrompt);
+            lastPromptUpdate = Date.now();
+            return true;
+        } catch (err) {
+            console.error("Failed to fetch new prompt after retries:", err);
+            window.showToast("Fuck, I can’t get a new prompt from the API! Trying again in next cycle.");
+            lastPromptUpdate = Date.now();
+            return false;
+        } finally {
+            isFetchingPrompt = false;
+        }
     }
-    update() {
-      this.x += this.speedX;
-      this.y += this.speedY;
-      if (this.x > window.innerWidth) this.x = 0;
-      if (this.x < 0) this.x = window.innerWidth;
-      if (this.y > window.innerHeight) this.y = 0;
-      if (this.y < 0) this.y = window.innerHeight;
+
+    async function fetchNewImage() {
+        if (isTransitioning) return;
+        isTransitioning = true;
+
+        saveScreensaverSettings();
+        let prompt = promptInput.value.trim();
+        if (!prompt || autoPromptEnabled) {
+            const success = await updatePrompt();
+            if (success) {
+                prompt = promptInput.value.trim();
+            } else if (!prompt) {
+                isTransitioning = false;
+                return;
+            }
+        }
+
+        const { width, height } = getDimensions(settings.aspect);
+        const seed = generateSeed();
+        const model = settings.model || "flux";
+        const enhance = settings.enhance;
+        const priv = settings.priv;
+
+        const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${width}&height=${height}&seed=${seed}&model=${model}&nologo=true&private=${priv}&enhance=${enhance}&safe=false&nolog=true`;
+        console.log("Generated new image URL:", url);
+
+        const nextImage = currentImage === 'image1' ? 'image2' : 'image1';
+        const nextImgElement = document.getElementById(`screensaver-${nextImage}`);
+        const currentImgElement = document.getElementById(`screensaver-${currentImage}`);
+
+        let finalImageUrl = url;
+        let imageAddedToHistory = false;
+
+        nextImgElement.onload = () => {
+            nextImgElement.style.opacity = '1';
+            currentImgElement.style.opacity = '0';
+            currentImage = nextImage;
+            if (!imageAddedToHistory) {
+                finalImageUrl = nextImgElement.src;
+                addToHistory(finalImageUrl, prompt);
+                imageAddedToHistory = true;
+            }
+            console.log("Image loaded successfully, added to history:", nextImgElement.src);
+        };
+
+        nextImgElement.onerror = () => {
+            const fallbackUrl = "https://via.placeholder.com/512?text=Image+Failed";
+            nextImgElement.src = fallbackUrl;
+            nextImgElement.onload = () => {
+                nextImgElement.style.opacity = '1';
+                currentImgElement.style.opacity = '0';
+                currentImage = nextImage;
+                if (!imageAddedToHistory) {
+                    finalImageUrl = nextImgElement.src;
+                    addToHistory(finalImageUrl, prompt);
+                    imageAddedToHistory = true;
+                }
+                console.log("Image failed, added fallback to history:", nextImgElement.src);
+            };
+            nextImgElement.onerror = () => {
+                console.error("Fallback image also failed to load.");
+            };
+        };
+
+        try {
+            await preloadImage(url);
+            nextImgElement.src = url;
+        } catch (err) {
+            const fallbackUrl = "https://via.placeholder.com/512?text=Image+Failed";
+            nextImgElement.src = fallbackUrl;
+        } finally {
+            isTransitioning = false;
+        }
     }
-    draw(ctx) {
-      ctx.fillStyle = 'white';
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-      ctx.fill();
+
+    function addToHistory(imageUrl, prompt) {
+        if (imageHistory.includes(imageUrl)) {
+            console.log("Duplicate image URL detected, skipping:", imageUrl);
+            return;
+        }
+        imageHistory.unshift(imageUrl);
+        promptHistory.unshift(prompt);
+        if (imageHistory.length > MAX_HISTORY) {
+            imageHistory.pop();
+            promptHistory.pop();
+        }
+        saveImageHistory();
+        updateThumbnailHistory();
+        console.log("Current imageHistory length:", imageHistory.length, "Images:", imageHistory);
+        console.log("Current promptHistory length:", promptHistory.length, "Prompts:", promptHistory);
     }
-  }
 
-  // Initialize particle animation
-  function initParticles() {
-    const canvas = document.getElementById('screensaver-particles');
-    const ctx = canvas.getContext('2d');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    particles = [];
-    for (let i = 0; i < 100; i++) {
-      particles.push(new Particle());
+    function updateThumbnailHistory() {
+        const thumbnailContainer = document.getElementById('screensaver-thumbnails');
+        if (!thumbnailContainer) {
+            console.error("Thumbnail container not found in DOM.");
+            window.showToast("Fuck, the thumbnail container is missing. Can’t populate the gallery.");
+            return;
+        }
+
+        thumbnailContainer.innerHTML = '';
+        imageHistory.forEach((imageUrl, index) => {
+            const thumb = document.createElement('img');
+            thumb.src = imageUrl;
+            thumb.classList.add('thumbnail');
+            thumb.title = promptHistory[index] || 'No prompt available';
+            thumb.alt = "Thumbnail Image";
+            thumb.style.opacity = '1';
+            thumb.onerror = () => {
+                console.log(`Thumbnail ${index + 1} failed to load, using fallback:`, imageUrl);
+                thumb.src = "https://via.placeholder.com/160x90?text=Image+Failed";
+                thumb.style.opacity = '1';
+            };
+            thumb.onload = () => {
+                console.log(`Thumbnail ${index + 1} loaded successfully:`, imageUrl);
+            };
+            thumb.onclick = () => showHistoricalImage(index);
+            const currentImgSrc = document.getElementById(`screensaver-${currentImage}`).src;
+            if (imageUrl === currentImgSrc) {
+                thumb.classList.add('selected');
+                console.log("Highlighted thumbnail as selected:", imageUrl);
+            }
+            thumbnailContainer.appendChild(thumb);
+            console.log(`Added thumbnail ${index + 1}/${imageHistory.length} to DOM:`, thumb.src);
+        });
+
+        thumbnailContainer.scrollTo({ left: 0, behavior: 'smooth' });
+        console.log("Updated thumbnail gallery with", imageHistory.length, "images. DOM count:", thumbnailContainer.children.length);
+
+        const offsetWidth = thumbnailContainer.offsetWidth;
+        thumbnailContainer.style.display = 'none';
+        thumbnailContainer.offsetHeight;
+        thumbnailContainer.style.display = 'flex';
+        console.log("Forced DOM reflow to ensure rendering. Container offsetWidth:", offsetWidth);
     }
-    function animate() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      particles.forEach(p => {
-        p.update();
-        p.draw(ctx);
-      });
-      animationFrameId = requestAnimationFrame(animate);
+
+    function showHistoricalImage(index) {
+        const imageUrl = imageHistory[index];
+        const currentImgElement = document.getElementById(`screensaver-${currentImage}`);
+        const nextImage = currentImage === 'image1' ? 'image2' : 'image1';
+        const nextImgElement = document.getElementById(`screensaver-${nextImage}`);
+        currentImgElement.style.opacity = '0';
+        nextImgElement.onload = () => {
+            nextImgElement.style.opacity = '1';
+            currentImage = nextImage;
+            updateThumbnailHistory();
+        };
+        nextImgElement.onerror = () => {
+            nextImgElement.src = "https://via.placeholder.com/512?text=Image+Failed";
+            nextImgElement.style.opacity = '1';
+            currentImage = nextImage;
+            updateThumbnailHistory();
+        };
+        nextImgElement.src = imageUrl;
+        nextImgElement.alt = "Screensaver Image";
+        if (nextImgElement.complete && nextImgElement.naturalWidth !== 0) {
+            nextImgElement.style.opacity = '1';
+            currentImgElement.style.opacity = '0';
+            currentImage = nextImage;
+            updateThumbnailHistory();
+        }
     }
-    animate();
-  }
 
-  // Stop particle animation
-  function stopParticles() {
-    cancelAnimationFrame(animationFrameId);
-    const canvas = document.getElementById('screensaver-particles');
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-  }
-
-  // Event listeners for settings
-  promptInput.addEventListener('input', () => {
-    settings.prompt = promptInput.value;
-    saveScreensaverSettings();
-  });
-
-  timerInput.addEventListener('change', () => {
-    settings.timer = parseInt(timerInput.value) || 30;
-    saveScreensaverSettings();
-    if (screensaverActive) setOrResetInterval();
-  });
-
-  aspectSelect.addEventListener('change', () => {
-    settings.aspect = aspectSelect.value;
-    saveScreensaverSettings();
-  });
-
-  modelSelect.addEventListener('change', () => {
-    settings.model = modelSelect.value;
-    saveScreensaverSettings();
-  });
-
-  enhanceCheckbox.addEventListener('change', () => {
-    settings.enhance = enhanceCheckbox.checked;
-    saveScreensaverSettings();
-  });
-
-  privateCheckbox.addEventListener('change', () => {
-    settings.priv = privateCheckbox.checked;
-    saveScreensaverSettings();
-  });
-
-  soundCheckbox.addEventListener('change', () => {
-    settings.sound = soundCheckbox.checked;
-    saveScreensaverSettings();
-  });
-
-  particlesCheckbox.addEventListener('change', () => {
-    settings.particlesEnabled = particlesCheckbox.checked;
-    saveScreensaverSettings();
-    if (screensaverActive) {
-      if (settings.particlesEnabled) initParticles();
-      else stopParticles();
+    function setOrResetImageInterval() {
+        clearInterval(imageInterval);
+        imageInterval = setInterval(() => {
+            if (!paused && screensaverActive) {
+                console.log("Fetching new image at interval...");
+                fetchNewImage();
+            }
+        }, settings.timer * 1000);
     }
-  });
 
-  transitionDurationInput.addEventListener('change', () => {
-    settings.transitionDuration = parseFloat(transitionDurationInput.value) || 1;
-    saveScreensaverSettings();
-    screensaverContainer.style.setProperty('--transition-duration', `${settings.transitionDuration}s`);
-  });
-
-  // Button event listeners with sound effects
-  toggleScreensaverButton.addEventListener("click", () => {
-    playSound('sounds/click.mp3');
-    screensaverActive ? stopScreensaver() : startScreensaver();
-  });
-
-  fullscreenButton.addEventListener("click", (e) => {
-    e.stopPropagation();
-    playSound('sounds/click.mp3');
-    toggleFullscreen();
-  });
-
-  stopButton.addEventListener("click", (e) => {
-    e.stopPropagation();
-    playSound('sounds/click.mp3');
-    stopScreensaver();
-  });
-
-  playPauseButton.addEventListener("click", (e) => {
-    e.stopPropagation();
-    playSound('sounds/click.mp3');
-    if (screensaverActive) togglePause();
-    else window.showToast("Start the screensaver first!");
-  });
-
-  saveButton.addEventListener("click", (e) => {
-    e.stopPropagation();
-    playSound('sounds/click.mp3');
-    if (screensaverActive) saveImage();
-    else window.showToast("Start the screensaver first!");
-  });
-
-  copyButton.addEventListener("click", (e) => {
-    e.stopPropagation();
-    playSound('sounds/click.mp3');
-    if (screensaverActive) copyImage();
-    else window.showToast("Start the screensaver first!");
-  });
-
-  // Keyboard shortcuts
-  document.addEventListener('keydown', (e) => {
-    if (!screensaverActive) return;
-    switch (e.key) {
-      case 'p': togglePause(); break;
-      case 's': saveImage(); break;
-      case 'c': copyImage(); break;
-      case 'f': toggleFullscreen(); break;
-      case 'Escape': stopScreensaver(); break;
+    function setOrResetPromptInterval() {
+        clearInterval(promptInterval);
+        promptInterval = null;
+        if (autoPromptEnabled && screensaverActive && !paused) {
+            lastPromptUpdate = Date.now();
+            updatePrompt().then(success => {
+                if (success) fetchNewImage();
+            });
+            promptInterval = setInterval(async () => {
+                if (!autoPromptEnabled || !screensaverActive || paused || isFetchingPrompt) {
+                    clearInterval(promptInterval);
+                    promptInterval = null;
+                    return;
+                }
+                const now = Date.now();
+                const elapsed = now - lastPromptUpdate;
+                if (elapsed >= PROMPT_UPDATE_INTERVAL) {
+                    const success = await updatePrompt();
+                    if (success) {
+                        await fetchNewImage();
+                    }
+                }
+            }, 1000);
+        }
     }
-  });
 
-  // Toast notification
-  window.showToast = function(message, duration = 3000) {
-    let toast = document.getElementById("toast-notification");
-    if (!toast) {
-      toast = document.createElement("div");
-      toast.id = "toast-notification";
-      toast.style.position = "fixed";
-      toast.style.top = "5%";
-      toast.style.left = "50%";
-      toast.style.transform = "translateX(-50%)";
-      toast.style.backgroundColor = "rgba(0,0,0,0.7)";
-      toast.style.color = "white";
-      toast.style.padding = "10px 20px";
-      toast.style.borderRadius = "5px";
-      toast.style.zIndex = "9999";
-      toast.style.transition = "opacity 0.3s";
-      document.body.appendChild(toast);
+    function toggleAutoPrompt() {
+        autoPromptEnabled = !autoPromptEnabled;
+        restartPromptButton.innerHTML = autoPromptEnabled ? "🔄 Auto-Prompt On" : "🔄 Auto-Prompt Off";
+        window.showToast(autoPromptEnabled ? "Auto-prompt generation enabled" : "Auto-prompt generation disabled");
+        if (autoPromptEnabled) {
+            setOrResetPromptInterval();
+        } else {
+            clearInterval(promptInterval);
+            promptInterval = null;
+            if (promptInput.value.trim() && screensaverActive) {
+                fetchNewImage();
+            }
+        }
     }
-    toast.textContent = message;
-    toast.style.opacity = "1";
-    clearTimeout(toast.timeout);
-    toast.timeout = setTimeout(() => toast.style.opacity = "0", duration);
-  };
 
-  console.log("Screensaver initialized with epic enhancements!");
+    function startScreensaver() {
+        screensaverActive = true;
+        paused = false;
+        controlsHidden = false;
+
+        screensaverContainer.style.position = "fixed";
+        screensaverContainer.style.top = "0";
+        screensaverContainer.style.left = "0";
+        screensaverContainer.style.width = "100vw";
+        screensaverContainer.style.height = "100vh";
+        screensaverContainer.style.zIndex = "9999";
+        screensaverContainer.classList.remove("hidden");
+
+        screensaverImage1.style.opacity = '0';
+        screensaverImage2.style.opacity = '0';
+
+        screensaverContainer.style.setProperty('--transition-duration', `${settings.transitionDuration}s`);
+
+        console.log("Starting screensaver, fetching initial image...");
+        fetchNewImage();
+        setOrResetImageInterval();
+        setOrResetPromptInterval();
+
+        toggleScreensaverButton.textContent = "Stop Screensaver";
+        playPauseButton.innerHTML = "⏸️";
+        hideButton.innerHTML = "🙈";
+        if (restartPromptButton) restartPromptButton.innerHTML = autoPromptEnabled ? "🔄 Auto-Prompt On" : "🔄 Auto-Prompt Off";
+
+        if (window.speechSynthesis) window.speechSynthesis.cancel();
+        document.body.style.overflow = "hidden";
+        window.screensaverActive = true;
+    }
+
+    function stopScreensaver() {
+        screensaverActive = false;
+        paused = false;
+        controlsHidden = false;
+        screensaverContainer.classList.add("hidden");
+        clearInterval(imageInterval);
+        clearInterval(promptInterval);
+        promptInterval = null;
+
+        imageHistory = [];
+        promptHistory = [];
+        localStorage.removeItem("imageHistory");
+        localStorage.removeItem("promptHistory");
+        updateThumbnailHistory();
+
+        document.body.style.overflow = "";
+        window.screensaverActive = false;
+
+        toggleScreensaverButton.textContent = "Start Screensaver";
+        playPauseButton.innerHTML = "▶️";
+        hideButton.innerHTML = "🙈";
+        if (restartPromptButton) restartPromptButton.innerHTML = autoPromptEnabled ? "🔄 Auto-Prompt On" : "🔄 Auto-Prompt Off";
+
+        if (isFullscreen) {
+            document.exitFullscreen().then(() => {
+                isFullscreen = false;
+                fullscreenButton.textContent = "⛶";
+            }).catch(err => console.error("Error exiting fullscreen on stop:", err));
+        }
+    }
+
+    function togglePause() {
+        paused = !paused;
+        playPauseButton.innerHTML = paused ? "▶️" : "⏸️";
+        window.showToast(paused ? "Screensaver paused" : "Screensaver resumed");
+        if (!paused) {
+            setOrResetImageInterval();
+            setOrResetPromptInterval();
+        }
+    }
+
+    function toggleControls() {
+        controlsHidden = !controlsHidden;
+        const controls = document.querySelector('.screensaver-controls');
+        const thumbnails = document.querySelector('.screensaver-thumbnails');
+        if (controlsHidden) {
+            controls.classList.add('hidden-panel');
+            thumbnails.classList.add('hidden-panel');
+            hideButton.innerHTML = "🙉";
+        } else {
+            controls.classList.remove('hidden-panel');
+            thumbnails.classList.remove('hidden-panel');
+            hideButton.innerHTML = "🙈";
+        }
+        window.showToast(controlsHidden ? "Controls hidden" : "Controls visible");
+    }
+
+    function saveImage() {
+        if (!document.getElementById(`screensaver-${currentImage}`).src) {
+            window.showToast("No image to save");
+            return;
+        }
+        fetch(document.getElementById(`screensaver-${currentImage}`).src, { mode: "cors" })
+            .then(response => {
+                if (!response.ok) throw new Error("Network response was not ok");
+                return response.blob();
+            })
+            .then(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `screensaver-image-${Date.now()}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                window.showToast("Image download initiated");
+            })
+            .catch(err => {
+                console.error("Error saving image:", err);
+                window.showToast("Failed to save image");
+            });
+    }
+
+    function copyImage() {
+        const currentImg = document.getElementById(`screensaver-${currentImage}`);
+        if (!currentImg.src) {
+            window.showToast("No image to copy");
+            return;
+        }
+        if (!currentImg.complete || currentImg.naturalWidth === 0) {
+            window.showToast("Image not fully loaded yet. Please try again.");
+            return;
+        }
+        copyButton.textContent = "📋 Copying...";
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = currentImg.naturalWidth;
+        canvas.height = currentImg.naturalHeight;
+        ctx.drawImage(currentImg, 0, 0);
+        canvas.toBlob(blob => {
+            if (!blob) {
+                copyButton.textContent = "📋 Copy";
+                window.showToast("Failed to copy image: Unable to create blob.");
+                return;
+            }
+            navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
+                .then(() => {
+                    const dataURL = canvas.toDataURL("image/png");
+                    localStorage.setItem("lastCopiedImage", dataURL);
+                    copyButton.textContent = "✅ Copied!";
+                    window.showToast("Image copied to clipboard and saved to local storage");
+                    setTimeout(() => copyButton.textContent = "📋 Copy", 1500);
+                })
+                .catch(err => {
+                    copyButton.textContent = "❌ Failed";
+                    window.showToast("Copy failed: " + err.message);
+                    setTimeout(() => copyButton.textContent = "📋 Copy", 1500);
+                });
+        }, "image/png");
+    }
+
+    function toggleFullscreen() {
+        if (!screensaverActive) {
+            window.showToast("Start the screensaver first!");
+            return;
+        }
+        if (!document.fullscreenElement) {
+            screensaverContainer.requestFullscreen()
+                .then(() => {
+                    isFullscreen = true;
+                    fullscreenButton.textContent = "↙";
+                    screensaverImage1.style.objectFit = "contain";
+                    screensaverImage2.style.objectFit = "contain";
+                    screensaverContainer.style.backgroundColor = "#000000";
+                })
+                .catch(err => window.showToast("Failed to enter fullscreen: " + err.message));
+        } else {
+            document.exitFullscreen()
+                .then(() => {
+                    isFullscreen = false;
+                    fullscreenButton.textContent = "⛶";
+                    screensaverImage1.style.objectFit = "cover";
+                    screensaverImage2.style.objectFit = "cover";
+                    screensaverContainer.style.backgroundColor = "#000000";
+                })
+                .catch(err => window.showToast("Failed to exit fullscreen: " + err.message));
+        }
+    }
+
+    promptInput.addEventListener('focus', () => {
+        clearInterval(promptInterval);
+        promptInterval = null;
+    });
+
+    promptInput.addEventListener('input', () => {
+        settings.prompt = promptInput.value;
+    });
+
+    timerInput.addEventListener('change', () => {
+        settings.timer = parseInt(timerInput.value) || 30;
+        saveScreensaverSettings();
+        if (screensaverActive) setOrResetImageInterval();
+    });
+
+    aspectSelect.addEventListener('change', () => {
+        settings.aspect = aspectSelect.value;
+        saveScreensaverSettings();
+    });
+
+    modelSelect.addEventListener('change', () => {
+        settings.model = modelSelect.value;
+        saveScreensaverSettings();
+    });
+
+    enhanceCheckbox.addEventListener('change', () => {
+        settings.enhance = enhanceCheckbox.checked;
+        saveScreensaverSettings();
+    });
+
+    privateCheckbox.addEventListener('change', () => {
+        settings.priv = privateCheckbox.checked;
+        saveScreensaverSettings();
+    });
+
+    transitionDurationInput.addEventListener('change', () => {
+        settings.transitionDuration = parseFloat(transitionDurationInput.value) || 1;
+        saveScreensaverSettings();
+        screensaverContainer.style.setProperty('--transition-duration', `${settings.transitionDuration}s`);
+    });
+
+    if (restartPromptButton) {
+        restartPromptButton.addEventListener("click", (e) => {
+            e.stopPropagation();
+            toggleAutoPrompt();
+        });
+    }
+
+    toggleScreensaverButton.addEventListener("click", () => {
+        screensaverActive ? stopScreensaver() : startScreensaver();
+    });
+
+    fullscreenButton.addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleFullscreen();
+    });
+
+    stopButton.addEventListener("click", (e) => {
+        e.stopPropagation();
+        stopScreensaver();
+    });
+
+    playPauseButton.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (screensaverActive) togglePause();
+        else window.showToast("Start the screensaver first!");
+    });
+
+    saveButton.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (screensaverActive) saveImage();
+        else window.showToast("Start the screensaver first!");
+    });
+
+    copyButton.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (screensaverActive) copyImage();
+        else window.showToast("Start the screensaver first!");
+    });
+
+    hideButton.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (screensaverActive) toggleControls();
+        else window.showToast("Start the screensaver first!");
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (!screensaverActive) return;
+        switch (e.key) {
+            case 'p': togglePause(); break;
+            case 's': saveImage(); break;
+            case 'c': copyImage(); break;
+            case 'f': toggleFullscreen(); break;
+            case 'Escape':
+                if (controlsHidden) toggleControls();
+                else stopScreensaver();
+                break;
+            case 'h': toggleControls(); break;
+            case 'r': toggleAutoPrompt(); break;
+        }
+    });
+
+    window.showToast = function(message, duration = 3000) {
+        let toast = document.getElementById("toast-notification");
+        if (!toast) {
+            toast = document.createElement("div");
+            toast.id = "toast-notification";
+            toast.style.position = "fixed";
+            toast.style.top = "5%";
+            toast.style.left = "50%";
+            toast.style.transform = "translateX(-50%)";
+            toast.style.backgroundColor = "rgba(0,0,0,0.7)";
+            toast.style.color = "white";
+            toast.style.padding = "10px 20px";
+            toast.style.borderRadius = "5px";
+            toast.style.zIndex = "9999";
+            toast.style.transition = "opacity 0.3s";
+            document.body.appendChild(toast);
+        }
+        toast.textContent = message;
+        toast.style.opacity = "1";
+        clearTimeout(toast.timeout);
+        toast.timeout = setTimeout(() => toast.style.opacity = "0", duration);
+    };
+
+    console.log("Screensaver initialized with dynamic API prompts and streaming thumbnail gallery!");
 });
