@@ -31,7 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let autoPromptEnabled = true;
     let isFetchingPrompt = false;
     let lastPromptUpdate = 0;
-    const MAX_HISTORY = 12;
+    const MAX_HISTORY = 10;
     const PROMPT_UPDATE_INTERVAL = 20000;
 
     let settings = {
@@ -108,10 +108,19 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function loadImageHistory() {
-        imageHistory = [];
-        promptHistory = [];
+        try {
+            const imagesRaw = localStorage.getItem("imageHistory");
+            const promptsRaw = localStorage.getItem("promptHistory");
+            imageHistory = imagesRaw ? JSON.parse(imagesRaw) : [];
+            promptHistory = promptsRaw ? JSON.parse(promptsRaw) : [];
+            console.log("Loaded imageHistory from localStorage:", imageHistory);
+            console.log("Loaded promptHistory from localStorage:", promptHistory);
+        } catch (err) {
+            console.warn("Failed to parse image history from localStorage:", err);
+            imageHistory = [];
+            promptHistory = [];
+        }
         updateThumbnailHistory();
-        console.log("Cleared imageHistory and promptHistory on startup.");
     }
 
     loadScreensaverSettings();
@@ -297,7 +306,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         thumbnailContainer.innerHTML = '';
-        imageHistory.forEach((imageUrl, index) => {
+        imageHistory.slice(0, MAX_HISTORY).forEach((imageUrl, index) => {
             const thumb = document.createElement('img');
             thumb.src = imageUrl;
             thumb.classList.add('thumbnail');
